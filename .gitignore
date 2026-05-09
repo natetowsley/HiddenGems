@@ -1,0 +1,89 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Java / Spring / Maven
+*.class
+*.log
+**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Keep Maven wrapper files committed
+!.mvn/wrapper/maven-wrapper.jar
+!mvnw
+!mvnw.cmd
+
+# Node / React / Next / Expo
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/coverage/
+**/.expo/
+**/.expo-shared/
+.pnp
+.pnp.js
+*.tsbuildinfo
+next-env.d.ts
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+lerna-debug.log*
+logs/
+
+# React Native / Android
+**/.gradle/
+**/android/local.properties
+**/android/app/build/
+**/android/build/
+**/android/.cxx/
+**/android/.externalNativeBuild/
+*.apk
+*.aab
+*.keystore
+*.jks
+google-services.json
+
+# iOS / Xcode
+**/ios/Pods/
+**/ios/build/
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Misc
+*.pem
+*.tgz
+*.zip
+*.tar.gz
+*.rar
+*.bak
+*.backup
