@@ -35,6 +35,18 @@ buildNumber.properties
 *.tsbuildinfo
 next-env.d.ts
 
+# Yarn / PnP
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Vercel
+.vercel/
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
