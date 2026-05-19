@@ -8,6 +8,9 @@ public record CreateUserRequest(
     @NotBlank(message = "Name is required")
     String name,
 
+    @NotBlank(message = "Username is required")
+    String username,
+
     @Email(message = "Must be a valid email")
     @NotBlank(message = "Email is required")
     String email,

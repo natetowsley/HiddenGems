@@ -35,7 +35,7 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        mockUser = new User("John Doe", "john@example.com");
+        mockUser = new User("John Doe", "johndoe", "john@example.com");
         mockUser.setAvatarUrl("https://example.com/avatar.jpg");
     }
 
@@ -84,7 +84,7 @@ class UserServiceTest {
 
     @Test
     void createUser_whenEmailIsNew_savesAndReturnsUserResponse() {
-        CreateUserRequest request = new CreateUserRequest("John Doe", "john@example.com", null);
+        CreateUserRequest request = new CreateUserRequest("John Doe", "johndoe", "john@example.com", null);
 
         when(userRepository.existsByEmail("john@example.com")).thenReturn(false);
         when(userRepository.save(any(User.class))).thenReturn(mockUser);
@@ -98,7 +98,7 @@ class UserServiceTest {
 
     @Test
     void createUser_whenEmailAlreadyExists_throwsIllegalStateException() {
-        CreateUserRequest request = new CreateUserRequest("John Doe", "john@example.com", null);
+        CreateUserRequest request = new CreateUserRequest("John Doe", "johndoe", "john@example.com", null);
 
         when(userRepository.existsByEmail("john@example.com")).thenReturn(true);
 
@@ -163,7 +163,7 @@ class UserServiceTest {
 
     @Test
     void findOrCreate_whenUserExists_returnsExistingUser() {
-        CreateUserRequest request = new CreateUserRequest("John Doe", "john@example.com", null);
+        CreateUserRequest request = new CreateUserRequest("John Doe", "johndoe", "john@example.com", null);
 
         when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(mockUser));
 
@@ -175,7 +175,7 @@ class UserServiceTest {
 
     @Test
     void findOrCreate_whenUserDoesNotExist_createsAndReturnsNewUser() {
-        CreateUserRequest request = new CreateUserRequest("John Doe", "john@example.com", null);
+        CreateUserRequest request = new CreateUserRequest("John Doe", "johndoe", "john@example.com", null);
 
         when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
         when(userRepository.existsByEmail("john@example.com")).thenReturn(false);

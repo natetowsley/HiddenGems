@@ -42,7 +42,7 @@ public class UserService {
             throw new IllegalStateException("Email already in use: " + request.email());
         }
 
-        User user = new User(request.name(), request.email());
+        User user = new User(request.name(), request.username(), request.email());
         user.setAvatarUrl(request.avatarUrl());
 
         return UserResponse.from(userRepository.save(user));

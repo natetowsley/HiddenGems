@@ -9,13 +9,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(
-    name = "users",
-    schema = "public",
-    uniqueConstraints = {
+@Table(name = "users", schema = "public", uniqueConstraints = {
         @UniqueConstraint(name = "users_email_key", columnNames = "email")
-    }
-)
+})
 public class User {
 
     @Id
@@ -26,6 +22,9 @@ public class User {
 
     @Column(name = "name", nullable = false, length = 255)
     private String name;
+
+    @Column(name = "username", nullable = false, unique = true, length = 255)
+    private String username;
 
     @Column(name = "email", nullable = false, length = 255)
     private String email;
@@ -51,29 +50,66 @@ public class User {
     }
 
     // Constructors
-    public User() {}
+    public User() {
+    }
 
-    public User(String name, String email) {
+    public User(String name, String username, String email) {
         this.name = name;
+        this.username = username;
         this.email = email;
         this.role = Role.user;
     }
 
     // Getters & Setters
-    public UUID getId() { return id; }
+    public UUID getId() {
+        return id;
+    }
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public String getName() {
+        return name;
+    }
 
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    public Role getRole() { return role; }
-    public void setRole(Role role) { this.role = role; }
+    public String getUsername() {
+        return username;
+    }
 
-    public String getAvatarUrl() { return avatarUrl; }
-    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public void setUsername(String username) {
+        this.username = username;
+    }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
 }
