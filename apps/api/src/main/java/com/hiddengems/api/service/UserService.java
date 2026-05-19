@@ -62,7 +62,7 @@ public class UserService {
     // Delete
     public void deleteUser(UUID id) {
         if (!userRepository.existsById(id)) {
-            throw new EntityNotFoundException("User not found: " + id));
+            throw new EntityNotFoundException("User not found: " + id);
         }
         userRepository.deleteById(id);
     }
