@@ -1,12 +1,19 @@
+server:
+  port: 8080
+
 spring:
   application:
     name: api
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwks-uri: ${SUPABASE_JWKS_URI}
 
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
-    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -16,3 +23,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+logging:
+  level:
+    org.springframework.security: DEBUG
