@@ -45,7 +45,9 @@ public class UserService {
         User user = new User(request.name(), request.username(), request.email());
         user.setAvatarUrl(request.avatarUrl());
 
-        return UserResponse.from(userRepository.save(user));
+        User saved = userRepository.save(user);
+        userRepository.flush();
+        return UserResponse.from(userRepository.findById(saved.getId()).orElseThrow());
     }
 
     // Update
