@@ -7,6 +7,7 @@ import com.hiddengems.api.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -37,8 +38,7 @@ public class UserController {
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> updateUser(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateUserRequest request
-    ) {
+            @Valid @RequestBody UpdateUserRequest request) {
         return ResponseEntity.ok(userService.updateUser(id, request));
     }
 
@@ -47,5 +47,12 @@ public class UserController {
     public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // GET /api/users/me
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getMe(JwtAuthenticationToken auth) {
+        UUID userId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(userService.getById(userId));
     }
 }
