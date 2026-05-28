@@ -99,3 +99,6 @@ $RECYCLE.BIN/
 *.rar
 *.bak
 *.backup
+
+database-schema.txt
+CONTEXT.md
