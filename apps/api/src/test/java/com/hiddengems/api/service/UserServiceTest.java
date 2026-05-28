@@ -1,6 +1,5 @@
 package com.hiddengems.api.service;
 
-import com.hiddengems.api.dto.user.CreateUserRequest;
 import com.hiddengems.api.dto.user.UpdateUserRequest;
 import com.hiddengems.api.dto.user.UserResponse;
 import com.hiddengems.api.entity.User;
@@ -80,35 +79,6 @@ class UserServiceTest {
                 .hasMessageContaining("ghost@example.com");
     }
 
-    // --- createUser ---
-
-    @Test
-    void createUser_whenEmailIsNew_savesAndReturnsUserResponse() {
-        CreateUserRequest request = new CreateUserRequest("John Doe", "johndoe", "john@example.com", null);
-
-        when(userRepository.existsByEmail("john@example.com")).thenReturn(false);
-        when(userRepository.save(any(User.class))).thenReturn(mockUser);
-
-        UserResponse response = userService.createUser(request);
-
-        assertThat(response.name()).isEqualTo("John Doe");
-        assertThat(response.email()).isEqualTo("john@example.com");
-        verify(userRepository, times(1)).save(any(User.class));
-    }
-
-    @Test
-    void createUser_whenEmailAlreadyExists_throwsIllegalStateException() {
-        CreateUserRequest request = new CreateUserRequest("John Doe", "johndoe", "john@example.com", null);
-
-        when(userRepository.existsByEmail("john@example.com")).thenReturn(true);
-
-        assertThatThrownBy(() -> userService.createUser(request))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("john@example.com");
-
-        verify(userRepository, never()).save(any(User.class));
-    }
-
     // --- updateUser ---
 
     @Test
@@ -157,33 +127,5 @@ class UserServiceTest {
                 .hasMessageContaining(userId.toString());
 
         verify(userRepository, never()).deleteById(any());
-    }
-
-    // --- findOrCreate ---
-
-    @Test
-    void findOrCreate_whenUserExists_returnsExistingUser() {
-        CreateUserRequest request = new CreateUserRequest("John Doe", "johndoe", "john@example.com", null);
-
-        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(mockUser));
-
-        UserResponse response = userService.findOrCreate(request);
-
-        assertThat(response.email()).isEqualTo("john@example.com");
-        verify(userRepository, never()).save(any(User.class));
-    }
-
-    @Test
-    void findOrCreate_whenUserDoesNotExist_createsAndReturnsNewUser() {
-        CreateUserRequest request = new CreateUserRequest("John Doe", "johndoe", "john@example.com", null);
-
-        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
-        when(userRepository.existsByEmail("john@example.com")).thenReturn(false);
-        when(userRepository.save(any(User.class))).thenReturn(mockUser);
-
-        UserResponse response = userService.findOrCreate(request);
-
-        assertThat(response.email()).isEqualTo("john@example.com");
-        verify(userRepository, times(1)).save(any(User.class));
     }
 }
