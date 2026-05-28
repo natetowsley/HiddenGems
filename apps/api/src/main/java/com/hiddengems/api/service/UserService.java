@@ -36,20 +36,6 @@ public class UserService {
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + email));
     }
 
-    // Create
-    public UserResponse createUser(CreateUserRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new IllegalStateException("Email already in use: " + request.email());
-        }
-
-        User user = new User(request.name(), request.username(), request.email());
-        user.setAvatarUrl(request.avatarUrl());
-
-        User saved = userRepository.save(user);
-        userRepository.flush();
-        return UserResponse.from(userRepository.findById(saved.getId()).orElseThrow());
-    }
-
     // Update
     public UserResponse updateUser(UUID id, UpdateUserRequest request) {
         User user = userRepository.findById(id)
@@ -67,12 +53,5 @@ public class UserService {
             throw new EntityNotFoundException("User not found: " + id);
         }
         userRepository.deleteById(id);
-    }
-
-    // OAuth helper
-    public UserResponse findOrCreate(CreateUserRequest request) {
-        return userRepository.findByEmail(request.email())
-                .map(UserResponse::from)
-                .orElseGet(() -> createUser(request));
     }
 }

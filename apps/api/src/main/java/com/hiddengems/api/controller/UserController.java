@@ -28,12 +28,6 @@ public class UserController {
         return ResponseEntity.ok(userService.getById(id));
     }
 
-    // POST /api/users
-    @PostMapping
-    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(request));
-    }
-
     // PUT /api/users/{id}
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> updateUser(
