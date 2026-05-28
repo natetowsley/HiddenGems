@@ -1,11 +1,9 @@
 package com.hiddengems.api.controller;
 
-import com.hiddengems.api.dto.user.CreateUserRequest;
 import com.hiddengems.api.dto.user.UpdateUserRequest;
 import com.hiddengems.api.dto.user.UserResponse;
 import com.hiddengems.api.service.UserService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;

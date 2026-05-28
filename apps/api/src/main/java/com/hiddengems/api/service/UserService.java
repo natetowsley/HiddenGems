@@ -1,6 +1,5 @@
 package com.hiddengems.api.service;
 
-import com.hiddengems.api.dto.user.CreateUserRequest;
 import com.hiddengems.api.dto.user.UpdateUserRequest;
 import com.hiddengems.api.dto.user.UserResponse;
 import com.hiddengems.api.entity.User;

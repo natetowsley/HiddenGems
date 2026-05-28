@@ -4,7 +4,9 @@ import com.hiddengems.api.dto.location.CreateLocationRequest;
 import com.hiddengems.api.dto.location.LocationResponse;
 import com.hiddengems.api.dto.location.UpdateLocationRequest;
 import com.hiddengems.api.entity.Location;
+import com.hiddengems.api.entity.User;
 import com.hiddengems.api.repository.LocationRepository;
+import com.hiddengems.api.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -18,9 +20,11 @@ import java.util.UUID;
 public class LocationService {
 
     private final LocationRepository locationRepository;
+    private final UserRepository userRepository;
 
-    public LocationService(LocationRepository locationRepository) {
+    public LocationService(LocationRepository locationRepository, UserRepository userRepository) {
         this.locationRepository = locationRepository;
+        this.userRepository = userRepository;
     }
 
     // Find
@@ -65,8 +69,7 @@ public class LocationService {
                 category,
                 request.lat(),
                 request.lng(),
-                createdBy
-        );
+                createdBy);
 
         location.setDescription(request.description());
         location.setTags(request.tags() != null ? request.tags() : List.of());
@@ -136,8 +139,17 @@ public class LocationService {
     }
 
     private void checkOwnership(Location location, UUID requesterId) {
-        if (!location.getCreatedBy().equals(requesterId)) {
-            throw new AccessDeniedException("You do not have permission to modify this location");
+        if (location.getCreatedBy().equals(requesterId)) {
+            return;
         }
+
+        User requester = userRepository.findById(requesterId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + requesterId));
+
+        if (requester.getRole() == User.Role.admin) {
+            return;
+        }
+
+        throw new AccessDeniedException("You do not have permission to modify this location");
     }
 }
