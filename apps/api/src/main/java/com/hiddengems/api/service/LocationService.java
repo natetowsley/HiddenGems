@@ -6,6 +6,7 @@ import com.hiddengems.api.dto.location.UpdateLocationRequest;
 import com.hiddengems.api.entity.Location;
 import com.hiddengems.api.entity.User;
 import com.hiddengems.api.repository.LocationRepository;
+import com.hiddengems.api.repository.ReviewRepository;
 import com.hiddengems.api.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,10 +22,12 @@ public class LocationService {
 
     private final LocationRepository locationRepository;
     private final UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
 
-    public LocationService(LocationRepository locationRepository, UserRepository userRepository) {
+    public LocationService(LocationRepository locationRepository, UserRepository userRepository, ReviewRepository reviewRepository) {
         this.locationRepository = locationRepository;
         this.userRepository = userRepository;
+        this.reviewRepository = reviewRepository;
     }
 
     // Find
@@ -101,6 +104,7 @@ public class LocationService {
 
         checkOwnership(location, requesterId);
 
+        reviewRepository.deleteAllByLocationId(id);
         locationRepository.deleteById(id);
     }
 
