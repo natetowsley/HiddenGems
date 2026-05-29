@@ -63,6 +63,33 @@ public class LocationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<LocationResponse> getByCreatedBy(UUID userId) {
+        return locationRepository.findByCreatedBy(userId)
+                .stream()
+                .map(LocationResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LocationResponse> getNearby(double lat, double lng, double radiusKm) {
+        if (lat < -90 || lat > 90) {
+            throw new IllegalArgumentException("Latitude must be between -90 and 90");
+        }
+        if (lng < -180 || lng > 180) {
+            throw new IllegalArgumentException("Longitude must be between -180 and 180");
+        }
+        if (radiusKm <= 0 || radiusKm > 50) {
+            throw new IllegalArgumentException("Radius must be between 0 and 50 km");
+        }
+
+        double radiusMeters = radiusKm * 1000;
+        return locationRepository.findNearbyVerified(lat, lng, radiusMeters)
+                .stream()
+                .map(LocationResponse::from)
+                .toList();
+    }
+
     // Create
     public LocationResponse createLocation(CreateLocationRequest request, UUID createdBy) {
         Location.Category category = parseCategory(request.category());

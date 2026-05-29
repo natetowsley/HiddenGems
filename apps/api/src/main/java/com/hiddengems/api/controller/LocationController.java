@@ -74,6 +74,23 @@ public class LocationController {
         return ResponseEntity.noContent().build();
     }
 
+    // GET /api/locations/mine
+    @GetMapping("/mine")
+    public ResponseEntity<List<LocationResponse>> getMyLocations(JwtAuthenticationToken auth) {
+        UUID userId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(locationService.getByCreatedBy(userId));
+    }
+
+    // GET /api/locations/nearby
+    @GetMapping("/nearby")
+    public ResponseEntity<List<LocationResponse>> getNearbyLocations(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "5.0") double radius
+    ) {
+        return ResponseEntity.ok(locationService.getNearby(lat, lng, radius));
+    }
+
     // Admin
 
     // GET /api/locations/pending
