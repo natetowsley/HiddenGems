@@ -19,6 +19,17 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
 
     List<Location> findByCreatedBy(UUID createdBy);
 
+    @Query(
+        value = """
+            SELECT * FROM public.locations
+            WHERE status = 'verified'
+            AND ST_DWithin(coords, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusMeters)
+            ORDER BY ST_Distance(coords, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography)
+            """,
+        nativeQuery = true
+    )
+    List<Location> findNearbyVerified(@Param("lat") double lat, @Param("lng") double lng, @Param("radiusMeters") double radiusMeters);
+
     @Modifying
     @Query("UPDATE Location l SET l.avgRating = COALESCE((SELECT AVG(r.rating) FROM Review r WHERE r.locationId = :locationId), 0) WHERE l.id = :locationId")
     void recalculateAvgRating(@Param("locationId") UUID locationId);
