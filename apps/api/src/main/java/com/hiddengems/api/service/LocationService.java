@@ -166,6 +166,41 @@ public class LocationService {
         return LocationResponse.from(locationRepository.save(location));
     }
 
+    // Images
+
+    public LocationResponse addImage(UUID locationId, AddImageRequest request, UUID requesterId) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        checkOwnership(location, requesterId);
+
+        if (location.getImageUrls().size() >= MAX_IMAGES) {
+            throw new IllegalStateException("Location has reached the maximum of " + MAX_IMAGES + " images");
+        }
+
+        List<String> urls = new java.util.ArrayList<>(location.getImageUrls());
+        urls.add(request.url());
+        location.setImageUrls(urls);
+
+        return LocationResponse.from(locationRepository.save(location));
+    }
+
+    public void removeImage(UUID locationId, String imageUrl, UUID requesterId) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        checkOwnership(location, requesterId);
+
+        String objectPath = imageService.extractPath(ImageService.LOCATION_BUCKET, imageUrl);
+        imageService.deleteFile(ImageService.LOCATION_BUCKET, objectPath);
+
+        List<String> urls = new java.util.ArrayList<>(location.getImageUrls());
+        urls.remove(imageUrl);
+        location.setImageUrls(urls);
+
+        locationRepository.save(location);
+    }
+
     // Helpers
     private Location.Category parseCategory(String category) {
         try {
