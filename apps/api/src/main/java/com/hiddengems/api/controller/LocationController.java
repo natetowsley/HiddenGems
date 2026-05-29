@@ -1,5 +1,7 @@
 package com.hiddengems.api.controller;
 
+import com.hiddengems.api.dto.image.AddImageRequest;
+import com.hiddengems.api.dto.image.RemoveImageRequest;
 import com.hiddengems.api.dto.location.CreateLocationRequest;
 import com.hiddengems.api.dto.location.LocationResponse;
 import com.hiddengems.api.dto.location.UpdateLocationRequest;
@@ -89,6 +91,31 @@ public class LocationController {
             @RequestParam(defaultValue = "5.0") double radius
     ) {
         return ResponseEntity.ok(locationService.getNearby(lat, lng, radius));
+    }
+
+    // Images
+
+    // POST /api/locations/{id}/images
+    @PostMapping("/{id}/images")
+    public ResponseEntity<LocationResponse> addImage(
+            @PathVariable UUID id,
+            @Valid @RequestBody AddImageRequest request,
+            JwtAuthenticationToken auth
+    ) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(locationService.addImage(id, request, requesterId));
+    }
+
+    // DELETE /api/locations/{id}/images
+    @DeleteMapping("/{id}/images")
+    public ResponseEntity<Void> removeImage(
+            @PathVariable UUID id,
+            @Valid @RequestBody RemoveImageRequest request,
+            JwtAuthenticationToken auth
+    ) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        locationService.removeImage(id, request.url(), requesterId);
+        return ResponseEntity.noContent().build();
     }
 
     // Admin
