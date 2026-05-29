@@ -1,5 +1,7 @@
 package com.hiddengems.api.controller;
 
+import com.hiddengems.api.dto.image.AddImageRequest;
+import com.hiddengems.api.dto.image.RemoveImageRequest;
 import com.hiddengems.api.dto.review.CreateReviewRequest;
 import com.hiddengems.api.dto.review.ReviewResponse;
 import com.hiddengems.api.dto.review.UpdateReviewRequest;
@@ -62,6 +64,33 @@ public class ReviewController {
     ) {
         UUID requesterId = UUID.fromString(auth.getName());
         reviewService.deleteReview(locationId, id, requesterId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // Images
+
+    // POST /api/locations/{locationId}/reviews/{id}/images
+    @PostMapping("/{id}/images")
+    public ResponseEntity<ReviewResponse> addImage(
+            @PathVariable UUID locationId,
+            @PathVariable UUID id,
+            @Valid @RequestBody AddImageRequest request,
+            JwtAuthenticationToken auth
+    ) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(reviewService.addImage(locationId, id, request, requesterId));
+    }
+
+    // DELETE /api/locations/{locationId}/reviews/{id}/images
+    @DeleteMapping("/{id}/images")
+    public ResponseEntity<Void> removeImage(
+            @PathVariable UUID locationId,
+            @PathVariable UUID id,
+            @Valid @RequestBody RemoveImageRequest request,
+            JwtAuthenticationToken auth
+    ) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        reviewService.removeImage(locationId, id, request.url(), requesterId);
         return ResponseEntity.noContent().build();
     }
 }

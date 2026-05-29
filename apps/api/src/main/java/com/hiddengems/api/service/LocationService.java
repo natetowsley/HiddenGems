@@ -1,5 +1,6 @@
 package com.hiddengems.api.service;
 
+import com.hiddengems.api.dto.image.AddImageRequest;
 import com.hiddengems.api.dto.location.CreateLocationRequest;
 import com.hiddengems.api.dto.location.LocationResponse;
 import com.hiddengems.api.dto.location.UpdateLocationRequest;
@@ -20,14 +21,18 @@ import java.util.UUID;
 @Transactional
 public class LocationService {
 
+    private static final int MAX_IMAGES = 10;
+
     private final LocationRepository locationRepository;
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
+    private final ImageService imageService;
 
-    public LocationService(LocationRepository locationRepository, UserRepository userRepository, ReviewRepository reviewRepository) {
+    public LocationService(LocationRepository locationRepository, UserRepository userRepository, ReviewRepository reviewRepository, ImageService imageService) {
         this.locationRepository = locationRepository;
         this.userRepository = userRepository;
         this.reviewRepository = reviewRepository;
+        this.imageService = imageService;
     }
 
     // Find
@@ -103,6 +108,7 @@ public class LocationService {
 
         location.setDescription(request.description());
         location.setTags(request.tags() != null ? request.tags() : List.of());
+        location.setImageUrls(request.imageUrls() != null ? request.imageUrls() : List.of());
 
         Location saved = locationRepository.save(location);
         locationRepository.flush();
@@ -158,6 +164,41 @@ public class LocationService {
 
         location.setStatus(Location.Status.archived);
         return LocationResponse.from(locationRepository.save(location));
+    }
+
+    // Images
+
+    public LocationResponse addImage(UUID locationId, AddImageRequest request, UUID requesterId) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        checkOwnership(location, requesterId);
+
+        if (location.getImageUrls().size() >= MAX_IMAGES) {
+            throw new IllegalStateException("Location has reached the maximum of " + MAX_IMAGES + " images");
+        }
+
+        List<String> urls = new java.util.ArrayList<>(location.getImageUrls());
+        urls.add(request.url());
+        location.setImageUrls(urls);
+
+        return LocationResponse.from(locationRepository.save(location));
+    }
+
+    public void removeImage(UUID locationId, String imageUrl, UUID requesterId) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        checkOwnership(location, requesterId);
+
+        String objectPath = imageService.extractPath(ImageService.LOCATION_BUCKET, imageUrl);
+        imageService.deleteFile(ImageService.LOCATION_BUCKET, objectPath);
+
+        List<String> urls = new java.util.ArrayList<>(location.getImageUrls());
+        urls.remove(imageUrl);
+        location.setImageUrls(urls);
+
+        locationRepository.save(location);
     }
 
     // Helpers
