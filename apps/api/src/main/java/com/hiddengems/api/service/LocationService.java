@@ -1,5 +1,6 @@
 package com.hiddengems.api.service;
 
+import com.hiddengems.api.dto.image.AddImageRequest;
 import com.hiddengems.api.dto.location.CreateLocationRequest;
 import com.hiddengems.api.dto.location.LocationResponse;
 import com.hiddengems.api.dto.location.UpdateLocationRequest;
@@ -20,14 +21,18 @@ import java.util.UUID;
 @Transactional
 public class LocationService {
 
+    private static final int MAX_IMAGES = 10;
+
     private final LocationRepository locationRepository;
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
+    private final ImageService imageService;
 
-    public LocationService(LocationRepository locationRepository, UserRepository userRepository, ReviewRepository reviewRepository) {
+    public LocationService(LocationRepository locationRepository, UserRepository userRepository, ReviewRepository reviewRepository, ImageService imageService) {
         this.locationRepository = locationRepository;
         this.userRepository = userRepository;
         this.reviewRepository = reviewRepository;
+        this.imageService = imageService;
     }
 
     // Find
@@ -103,6 +108,7 @@ public class LocationService {
 
         location.setDescription(request.description());
         location.setTags(request.tags() != null ? request.tags() : List.of());
+        location.setImageUrls(request.imageUrls() != null ? request.imageUrls() : List.of());
 
         Location saved = locationRepository.save(location);
         locationRepository.flush();
