@@ -1,5 +1,6 @@
 package com.hiddengems.api.service;
 
+import com.hiddengems.api.dto.image.AddImageRequest;
 import com.hiddengems.api.dto.review.CreateReviewRequest;
 import com.hiddengems.api.dto.review.ReviewResponse;
 import com.hiddengems.api.dto.review.UpdateReviewRequest;
@@ -20,14 +21,18 @@ import java.util.UUID;
 @Transactional
 public class ReviewService {
 
+    private static final int MAX_IMAGES = 3;
+
     private final ReviewRepository reviewRepository;
     private final LocationRepository locationRepository;
     private final UserRepository userRepository;
+    private final ImageService imageService;
 
-    public ReviewService(ReviewRepository reviewRepository, LocationRepository locationRepository, UserRepository userRepository) {
+    public ReviewService(ReviewRepository reviewRepository, LocationRepository locationRepository, UserRepository userRepository, ImageService imageService) {
         this.reviewRepository = reviewRepository;
         this.locationRepository = locationRepository;
         this.userRepository = userRepository;
+        this.imageService = imageService;
     }
 
     // Find
@@ -111,6 +116,57 @@ public class ReviewService {
 
         reviewRepository.deleteById(reviewId);
         locationRepository.recalculateAvgRating(locationId);
+    }
+
+    // Images
+
+    public ReviewResponse addImage(UUID locationId, UUID reviewId, AddImageRequest request, UUID requesterId) {
+        if (!locationRepository.existsById(locationId)) {
+            throw new EntityNotFoundException("Location not found: " + locationId);
+        }
+
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new EntityNotFoundException("Review not found: " + reviewId));
+
+        if (!review.getLocationId().equals(locationId)) {
+            throw new EntityNotFoundException("Review not found: " + reviewId);
+        }
+
+        checkOwnership(review, requesterId);
+
+        if (review.getImageUrls().size() >= MAX_IMAGES) {
+            throw new IllegalStateException("Review has reached the maximum of " + MAX_IMAGES + " images");
+        }
+
+        List<String> urls = new java.util.ArrayList<>(review.getImageUrls());
+        urls.add(request.url());
+        review.setImageUrls(urls);
+
+        return ReviewResponse.from(reviewRepository.save(review));
+    }
+
+    public void removeImage(UUID locationId, UUID reviewId, String imageUrl, UUID requesterId) {
+        if (!locationRepository.existsById(locationId)) {
+            throw new EntityNotFoundException("Location not found: " + locationId);
+        }
+
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new EntityNotFoundException("Review not found: " + reviewId));
+
+        if (!review.getLocationId().equals(locationId)) {
+            throw new EntityNotFoundException("Review not found: " + reviewId);
+        }
+
+        checkOwnership(review, requesterId);
+
+        String objectPath = imageService.extractPath(ImageService.REVIEW_BUCKET, imageUrl);
+        imageService.deleteFile(ImageService.REVIEW_BUCKET, objectPath);
+
+        List<String> urls = new java.util.ArrayList<>(review.getImageUrls());
+        urls.remove(imageUrl);
+        review.setImageUrls(urls);
+
+        reviewRepository.save(review);
     }
 
     // Helpers
