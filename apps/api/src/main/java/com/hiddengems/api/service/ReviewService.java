@@ -1,13 +1,16 @@
 package com.hiddengems.api.service;
 
 import com.hiddengems.api.dto.image.AddImageRequest;
+import com.hiddengems.api.dto.review.CastVoteRequest;
 import com.hiddengems.api.dto.review.CreateReviewRequest;
 import com.hiddengems.api.dto.review.ReviewResponse;
 import com.hiddengems.api.dto.review.UpdateReviewRequest;
 import com.hiddengems.api.entity.Review;
+import com.hiddengems.api.entity.ReviewVote;
 import com.hiddengems.api.entity.User;
 import com.hiddengems.api.repository.LocationRepository;
 import com.hiddengems.api.repository.ReviewRepository;
+import com.hiddengems.api.repository.ReviewVoteRepository;
 import com.hiddengems.api.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -26,12 +30,14 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final LocationRepository locationRepository;
     private final UserRepository userRepository;
+    private final ReviewVoteRepository reviewVoteRepository;
     private final ImageService imageService;
 
-    public ReviewService(ReviewRepository reviewRepository, LocationRepository locationRepository, UserRepository userRepository, ImageService imageService) {
+    public ReviewService(ReviewRepository reviewRepository, LocationRepository locationRepository, UserRepository userRepository, ReviewVoteRepository reviewVoteRepository, ImageService imageService) {
         this.reviewRepository = reviewRepository;
         this.locationRepository = locationRepository;
         this.userRepository = userRepository;
+        this.reviewVoteRepository = reviewVoteRepository;
         this.imageService = imageService;
     }
 
@@ -167,6 +173,76 @@ public class ReviewService {
         review.setImageUrls(urls);
 
         reviewRepository.save(review);
+    }
+
+    // Votes
+
+    public ReviewResponse castVote(UUID locationId, UUID reviewId, CastVoteRequest request, UUID userId) {
+        if (!locationRepository.existsById(locationId)) {
+            throw new EntityNotFoundException("Location not found: " + locationId);
+        }
+
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new EntityNotFoundException("Review not found: " + reviewId));
+
+        if (!review.getLocationId().equals(locationId)) {
+            throw new EntityNotFoundException("Review not found: " + reviewId);
+        }
+
+        if (review.getUserId().equals(userId)) {
+            throw new AccessDeniedException("You cannot vote on your own review");
+        }
+
+        Optional<ReviewVote> existing = reviewVoteRepository.findByReviewIdAndUserId(reviewId, userId);
+
+        if (existing.isPresent()) {
+            ReviewVote vote = existing.get();
+            if (vote.getVoteType() == request.voteType()) {
+                throw new IllegalStateException("You have already voted this way");
+            }
+            if (vote.getVoteType() == ReviewVote.VoteType.upvote) {
+                reviewRepository.decrementUpvotes(reviewId);
+                reviewRepository.incrementDownvotes(reviewId);
+            } else {
+                reviewRepository.decrementDownvotes(reviewId);
+                reviewRepository.incrementUpvotes(reviewId);
+            }
+            vote.setVoteType(request.voteType());
+            reviewVoteRepository.save(vote);
+        } else {
+            reviewVoteRepository.save(new ReviewVote(reviewId, userId, request.voteType()));
+            if (request.voteType() == ReviewVote.VoteType.upvote) {
+                reviewRepository.incrementUpvotes(reviewId);
+            } else {
+                reviewRepository.incrementDownvotes(reviewId);
+            }
+        }
+
+        return ReviewResponse.from(reviewRepository.findById(reviewId).orElseThrow());
+    }
+
+    public void removeVote(UUID locationId, UUID reviewId, UUID userId) {
+        if (!locationRepository.existsById(locationId)) {
+            throw new EntityNotFoundException("Location not found: " + locationId);
+        }
+
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new EntityNotFoundException("Review not found: " + reviewId));
+
+        if (!review.getLocationId().equals(locationId)) {
+            throw new EntityNotFoundException("Review not found: " + reviewId);
+        }
+
+        ReviewVote vote = reviewVoteRepository.findByReviewIdAndUserId(reviewId, userId)
+                .orElseThrow(() -> new EntityNotFoundException("Vote not found"));
+
+        if (vote.getVoteType() == ReviewVote.VoteType.upvote) {
+            reviewRepository.decrementUpvotes(reviewId);
+        } else {
+            reviewRepository.decrementDownvotes(reviewId);
+        }
+
+        reviewVoteRepository.deleteByReviewIdAndUserId(reviewId, userId);
     }
 
     // Helpers
