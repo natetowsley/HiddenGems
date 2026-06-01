@@ -2,6 +2,7 @@ package com.hiddengems.api.controller;
 
 import com.hiddengems.api.dto.image.AddImageRequest;
 import com.hiddengems.api.dto.image.RemoveImageRequest;
+import com.hiddengems.api.dto.review.CastVoteRequest;
 import com.hiddengems.api.dto.review.CreateReviewRequest;
 import com.hiddengems.api.dto.review.ReviewResponse;
 import com.hiddengems.api.dto.review.UpdateReviewRequest;
@@ -91,6 +92,32 @@ public class ReviewController {
     ) {
         UUID requesterId = UUID.fromString(auth.getName());
         reviewService.removeImage(locationId, id, request.url(), requesterId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // Votes
+
+    // POST /api/locations/{locationId}/reviews/{id}/votes
+    @PostMapping("/{id}/votes")
+    public ResponseEntity<ReviewResponse> castVote(
+            @PathVariable UUID locationId,
+            @PathVariable UUID id,
+            @Valid @RequestBody CastVoteRequest request,
+            JwtAuthenticationToken auth
+    ) {
+        UUID userId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(reviewService.castVote(locationId, id, request, userId));
+    }
+
+    // DELETE /api/locations/{locationId}/reviews/{id}/votes
+    @DeleteMapping("/{id}/votes")
+    public ResponseEntity<Void> removeVote(
+            @PathVariable UUID locationId,
+            @PathVariable UUID id,
+            JwtAuthenticationToken auth
+    ) {
+        UUID userId = UUID.fromString(auth.getName());
+        reviewService.removeVote(locationId, id, userId);
         return ResponseEntity.noContent().build();
     }
 }
