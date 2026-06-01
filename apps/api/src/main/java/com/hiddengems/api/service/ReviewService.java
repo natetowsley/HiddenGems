@@ -210,12 +210,12 @@ public class ReviewService {
             vote.setVoteType(request.voteType());
             reviewVoteRepository.save(vote);
         } else {
-            reviewVoteRepository.save(new ReviewVote(reviewId, userId, request.voteType()));
             if (request.voteType() == ReviewVote.VoteType.upvote) {
                 reviewRepository.incrementUpvotes(reviewId);
             } else {
                 reviewRepository.incrementDownvotes(reviewId);
             }
+            reviewVoteRepository.save(new ReviewVote(reviewId, userId, request.voteType()));
         }
 
         return ReviewResponse.from(reviewRepository.findById(reviewId).orElseThrow());
