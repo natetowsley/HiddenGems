@@ -15,5 +15,7 @@ public record UpdateLocationRequest(
         @NotNull(message = "Category is required")
         String category,
 
-        List<String> tags
+        List<String> tags,
+
+        Boolean isPrivate
 ) {}

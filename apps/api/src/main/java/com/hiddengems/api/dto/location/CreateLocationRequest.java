@@ -31,5 +31,7 @@ public record CreateLocationRequest(
         Double lng,
 
         @Size(max = 10, message = "A location can have at most 10 images")
-        List<String> imageUrls
+        List<String> imageUrls,
+
+        Boolean isPrivate
 ) {}
