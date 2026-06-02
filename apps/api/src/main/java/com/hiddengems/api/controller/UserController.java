@@ -23,7 +23,12 @@ public class UserController {
 
     // GET /api/users/{id}
     @GetMapping("/{id}")
-    public ResponseEntity<PublicUserResponse> getUserById(@PathVariable UUID id) {
+    public ResponseEntity<?> getUserById(@PathVariable UUID id, JwtAuthenticationToken auth) {
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isAdmin) {
+            return ResponseEntity.ok(userService.getById(id));
+        }
         return ResponseEntity.ok(userService.getPublicById(id));
     }
 
