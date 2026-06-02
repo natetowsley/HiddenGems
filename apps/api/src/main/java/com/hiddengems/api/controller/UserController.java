@@ -1,14 +1,19 @@
 package com.hiddengems.api.controller;
 
+import com.hiddengems.api.dto.collection.CollectionResponse;
+import com.hiddengems.api.dto.location.LocationResponse;
 import com.hiddengems.api.dto.user.PublicUserResponse;
 import com.hiddengems.api.dto.user.UpdateUserRequest;
 import com.hiddengems.api.dto.user.UserResponse;
+import com.hiddengems.api.service.CollectionService;
+import com.hiddengems.api.service.LocationService;
 import com.hiddengems.api.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -16,9 +21,13 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
+    private final LocationService locationService;
+    private final CollectionService collectionService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, LocationService locationService, CollectionService collectionService) {
         this.userService = userService;
+        this.locationService = locationService;
+        this.collectionService = collectionService;
     }
 
     // GET /api/users/{id}
@@ -50,6 +59,20 @@ public class UserController {
         UUID requesterId = UUID.fromString(auth.getName());
         userService.deleteUser(id, requesterId);
         return ResponseEntity.noContent().build();
+    }
+
+    // GET /api/users/{id}/locations
+    @GetMapping("/{id}/locations")
+    public ResponseEntity<List<LocationResponse>> getUserLocations(@PathVariable UUID id, JwtAuthenticationToken auth) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(locationService.getPublicByUser(id, requesterId));
+    }
+
+    // GET /api/users/{id}/collections
+    @GetMapping("/{id}/collections")
+    public ResponseEntity<List<CollectionResponse>> getUserCollections(@PathVariable UUID id, JwtAuthenticationToken auth) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(collectionService.getPublicByUser(id, requesterId));
     }
 
     // GET /api/users/me
