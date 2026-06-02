@@ -8,7 +8,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "follows", schema = "public")
+@Table(name = "follows", schema = "public", uniqueConstraints = {
+        @UniqueConstraint(name = "follows_follower_id_following_id_key", columnNames = {"follower_id", "following_id"})
+})
 public class Follow {
 
     @Id
