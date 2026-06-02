@@ -6,7 +6,9 @@ import com.hiddengems.api.dto.location.LocationResponse;
 import com.hiddengems.api.dto.location.UpdateLocationRequest;
 import com.hiddengems.api.entity.Location;
 import com.hiddengems.api.entity.User;
+import com.hiddengems.api.repository.CollectionItemRepository;
 import com.hiddengems.api.repository.LocationRepository;
+import com.hiddengems.api.repository.ReportRepository;
 import com.hiddengems.api.repository.ReviewRepository;
 import com.hiddengems.api.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -26,12 +28,16 @@ public class LocationService {
     private final LocationRepository locationRepository;
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
+    private final CollectionItemRepository collectionItemRepository;
+    private final ReportRepository reportRepository;
     private final ImageService imageService;
 
-    public LocationService(LocationRepository locationRepository, UserRepository userRepository, ReviewRepository reviewRepository, ImageService imageService) {
+    public LocationService(LocationRepository locationRepository, UserRepository userRepository, ReviewRepository reviewRepository, CollectionItemRepository collectionItemRepository, ReportRepository reportRepository, ImageService imageService) {
         this.locationRepository = locationRepository;
         this.userRepository = userRepository;
         this.reviewRepository = reviewRepository;
+        this.collectionItemRepository = collectionItemRepository;
+        this.reportRepository = reportRepository;
         this.imageService = imageService;
     }
 
@@ -137,6 +143,8 @@ public class LocationService {
 
         checkOwnership(location, requesterId);
 
+        collectionItemRepository.deleteAllByLocationId(id);
+        reportRepository.deleteAllByLocationId(id);
         reviewRepository.deleteAllByLocationId(id);
         locationRepository.deleteById(id);
     }
