@@ -166,8 +166,8 @@ public class LocationService {
         Location location = locationRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Location not found: " + id));
 
-        if (location.getStatus() == Location.Status.verified) {
-            throw new IllegalStateException("Cannot archive a verified location");
+        if (location.getStatus() == Location.Status.archived) {
+            throw new IllegalStateException("Location is already archived");
         }
 
         location.setStatus(Location.Status.archived);
