@@ -4,9 +4,12 @@ import com.hiddengems.api.dto.image.AddImageRequest;
 import com.hiddengems.api.dto.location.CreateLocationRequest;
 import com.hiddengems.api.dto.location.LocationResponse;
 import com.hiddengems.api.dto.location.UpdateLocationRequest;
+import com.hiddengems.api.dto.user.PublicUserResponse;
 import com.hiddengems.api.entity.Location;
+import com.hiddengems.api.entity.LocationInvite;
 import com.hiddengems.api.entity.User;
 import com.hiddengems.api.repository.CollectionItemRepository;
+import com.hiddengems.api.repository.LocationInviteRepository;
 import com.hiddengems.api.repository.LocationRepository;
 import com.hiddengems.api.repository.ReportRepository;
 import com.hiddengems.api.repository.ReviewRepository;
@@ -30,29 +33,43 @@ public class LocationService {
     private final ReviewRepository reviewRepository;
     private final CollectionItemRepository collectionItemRepository;
     private final ReportRepository reportRepository;
+    private final LocationInviteRepository locationInviteRepository;
     private final ImageService imageService;
 
-    public LocationService(LocationRepository locationRepository, UserRepository userRepository, ReviewRepository reviewRepository, CollectionItemRepository collectionItemRepository, ReportRepository reportRepository, ImageService imageService) {
+    public LocationService(
+            LocationRepository locationRepository,
+            UserRepository userRepository,
+            ReviewRepository reviewRepository,
+            CollectionItemRepository collectionItemRepository,
+            ReportRepository reportRepository,
+            LocationInviteRepository locationInviteRepository,
+            ImageService imageService) {
         this.locationRepository = locationRepository;
         this.userRepository = userRepository;
         this.reviewRepository = reviewRepository;
         this.collectionItemRepository = collectionItemRepository;
         this.reportRepository = reportRepository;
+        this.locationInviteRepository = locationInviteRepository;
         this.imageService = imageService;
     }
 
     // Find
+
     @Transactional(readOnly = true)
-    public LocationResponse getById(UUID id) {
-        return locationRepository.findById(id)
-                .map(LocationResponse::from)
+    public LocationResponse getById(UUID id, UUID requesterId) {
+        Location location = locationRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Location not found: " + id));
+        if (!hasLocationAccess(location, requesterId, isAdmin(requesterId))) {
+            throw new AccessDeniedException("You do not have permission to view this location");
+        }
+        return LocationResponse.from(location);
     }
 
     @Transactional(readOnly = true)
     public List<LocationResponse> getAllVerified() {
         return locationRepository.findByStatus(Location.Status.verified)
                 .stream()
+                .filter(l -> !l.isPrivate())
                 .map(LocationResponse::from)
                 .toList();
     }
@@ -62,6 +79,7 @@ public class LocationService {
         Location.Category parsedCategory = parseCategory(category);
         return locationRepository.findByStatusAndCategory(Location.Status.verified, parsedCategory)
                 .stream()
+                .filter(l -> !l.isPrivate())
                 .map(LocationResponse::from)
                 .toList();
     }
@@ -83,7 +101,7 @@ public class LocationService {
     }
 
     @Transactional(readOnly = true)
-    public List<LocationResponse> getNearby(double lat, double lng, double radiusKm) {
+    public List<LocationResponse> getNearby(double lat, double lng, double radiusKm, UUID requesterId) {
         if (lat < -90 || lat > 90) {
             throw new IllegalArgumentException("Latitude must be between -90 and 90");
         }
@@ -94,27 +112,38 @@ public class LocationService {
             throw new IllegalArgumentException("Radius must be between 0 and 50 km");
         }
 
+        boolean isAdmin = isAdmin(requesterId);
         double radiusMeters = radiusKm * 1000;
         return locationRepository.findNearbyVerified(lat, lng, radiusMeters)
                 .stream()
+                .filter(l -> hasLocationAccess(l, requesterId, isAdmin))
+                .map(LocationResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LocationResponse> getPublicByUser(UUID userId, UUID requesterId) {
+        if (!userRepository.existsById(userId)) {
+            throw new EntityNotFoundException("User not found: " + userId);
+        }
+        boolean isAdmin = isAdmin(requesterId);
+        return locationRepository.findByCreatedByAndStatus(userId, Location.Status.verified)
+                .stream()
+                .filter(l -> hasLocationAccess(l, requesterId, isAdmin))
                 .map(LocationResponse::from)
                 .toList();
     }
 
     // Create
+
     public LocationResponse createLocation(CreateLocationRequest request, UUID createdBy) {
         Location.Category category = parseCategory(request.category());
 
-        Location location = new Location(
-                request.name(),
-                category,
-                request.lat(),
-                request.lng(),
-                createdBy);
-
+        Location location = new Location(request.name(), category, request.lat(), request.lng(), createdBy);
         location.setDescription(request.description());
         location.setTags(request.tags() != null ? request.tags() : List.of());
         location.setImageUrls(request.imageUrls() != null ? request.imageUrls() : List.of());
+        location.setPrivate(request.isPrivate() != null && request.isPrivate());
 
         Location saved = locationRepository.save(location);
         locationRepository.flush();
@@ -122,6 +151,7 @@ public class LocationService {
     }
 
     // Update
+
     public LocationResponse updateLocation(UUID id, UpdateLocationRequest request, UUID requesterId) {
         Location location = locationRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Location not found: " + id));
@@ -132,17 +162,22 @@ public class LocationService {
         location.setDescription(request.description());
         location.setCategory(parseCategory(request.category()));
         location.setTags(request.tags() != null ? request.tags() : List.of());
+        if (request.isPrivate() != null) {
+            location.setPrivate(request.isPrivate());
+        }
 
         return LocationResponse.from(locationRepository.save(location));
     }
 
     // Delete
+
     public void deleteLocation(UUID id, UUID requesterId) {
         Location location = locationRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Location not found: " + id));
 
         checkOwnership(location, requesterId);
 
+        locationInviteRepository.deleteAllByLocationId(id);
         collectionItemRepository.deleteAllByLocationId(id);
         reportRepository.deleteAllByLocationId(id);
         reviewRepository.deleteAllByLocationId(id);
@@ -150,6 +185,7 @@ public class LocationService {
     }
 
     // Moderation
+
     public LocationResponse verifyLocation(UUID id) {
         Location location = locationRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Location not found: " + id));
@@ -172,6 +208,65 @@ public class LocationService {
 
         location.setStatus(Location.Status.archived);
         return LocationResponse.from(locationRepository.save(location));
+    }
+
+    // Invites
+
+    public void inviteUser(UUID locationId, String username, UUID requesterId) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        if (!location.getCreatedBy().equals(requesterId)) {
+            throw new AccessDeniedException("Only the location owner can invite users");
+        }
+
+        if (!location.isPrivate()) {
+            throw new IllegalStateException("Cannot invite users to a public location");
+        }
+
+        User invitee = userRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + username));
+
+        if (invitee.getId().equals(requesterId)) {
+            throw new IllegalArgumentException("You cannot invite yourself");
+        }
+
+        if (locationInviteRepository.existsByLocationIdAndUserId(locationId, invitee.getId())) {
+            throw new IllegalStateException("User is already invited to this location");
+        }
+
+        locationInviteRepository.save(new LocationInvite(locationId, invitee.getId()));
+    }
+
+    public void removeInvite(UUID locationId, UUID inviteeId, UUID requesterId) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        checkOwnership(location, requesterId);
+
+        if (!locationInviteRepository.existsByLocationIdAndUserId(locationId, inviteeId)) {
+            throw new EntityNotFoundException("User is not invited to this location");
+        }
+
+        locationInviteRepository.deleteByLocationIdAndUserId(locationId, inviteeId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PublicUserResponse> getInvites(UUID locationId, UUID requesterId) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        checkOwnership(location, requesterId);
+
+        List<UUID> invitedIds = locationInviteRepository.findByLocationId(locationId)
+                .stream()
+                .map(LocationInvite::getUserId)
+                .toList();
+
+        return userRepository.findAllById(invitedIds)
+                .stream()
+                .map(PublicUserResponse::from)
+                .toList();
     }
 
     // Images
@@ -210,6 +305,20 @@ public class LocationService {
     }
 
     // Helpers
+
+    private boolean hasLocationAccess(Location location, UUID requesterId, boolean isAdmin) {
+        if (!location.isPrivate()) return true;
+        if (isAdmin) return true;
+        if (location.getCreatedBy().equals(requesterId)) return true;
+        return locationInviteRepository.existsByLocationIdAndUserId(location.getId(), requesterId);
+    }
+
+    private boolean isAdmin(UUID userId) {
+        return userRepository.findById(userId)
+                .map(u -> u.getRole() == User.Role.admin)
+                .orElse(false);
+    }
+
     private Location.Category parseCategory(String category) {
         try {
             return Location.Category.valueOf(category);
@@ -222,14 +331,11 @@ public class LocationService {
         if (location.getCreatedBy().equals(requesterId)) {
             return;
         }
-
         User requester = userRepository.findById(requesterId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + requesterId));
-
         if (requester.getRole() == User.Role.admin) {
             return;
         }
-
         throw new AccessDeniedException("You do not have permission to modify this location");
     }
 }

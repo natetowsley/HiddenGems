@@ -42,6 +42,38 @@ public class CollectionService {
     }
 
     @Transactional(readOnly = true)
+    public List<CollectionResponse> getPublicByUser(UUID userId, UUID requesterId) {
+        if (!userRepository.existsById(userId)) {
+            throw new EntityNotFoundException("User not found: " + userId);
+        }
+
+        boolean isOwner = userId.equals(requesterId);
+        boolean isAdmin = !isOwner && userRepository.findById(requesterId)
+                .map(u -> u.getRole() == User.Role.admin)
+                .orElse(false);
+
+        List<Collection> collections = collectionRepository.findByUserId(userId);
+        List<Collection> visible = collections.stream()
+                .filter(c -> !c.isPrivate() || isOwner || isAdmin)
+                .toList();
+
+        if (visible.isEmpty()) return List.of();
+
+        List<UUID> visibleIds = visible.stream().map(Collection::getId).toList();
+        Map<UUID, List<UUID>> itemsByCollection = collectionItemRepository
+                .findByCollectionIdIn(visibleIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        CollectionItem::getCollectionId,
+                        Collectors.mapping(CollectionItem::getLocationId, Collectors.toList())
+                ));
+
+        return visible.stream()
+                .map(c -> CollectionResponse.from(c, itemsByCollection.getOrDefault(c.getId(), List.of())))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<CollectionResponse> getByUser(UUID userId) {
         List<Collection> collections = collectionRepository.findByUserId(userId);
 

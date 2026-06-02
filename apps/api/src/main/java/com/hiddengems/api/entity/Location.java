@@ -50,6 +50,9 @@ public class Location {
     @Column(name = "avg_rating", nullable = false, precision = 3, scale = 2)
     private BigDecimal avgRating = BigDecimal.ZERO;
 
+    @Column(name = "is_private", nullable = false)
+    private boolean isPrivate = false;
+
     @Column(name = "image_urls", columnDefinition = "text[]")
     private List<String> imageUrls = new ArrayList<>();
 
@@ -113,6 +116,9 @@ public class Location {
     public void setStatus(Status status) { this.status = status; }
 
     public BigDecimal getAvgRating() { return avgRating; }
+
+    public boolean isPrivate() { return isPrivate; }
+    public void setPrivate(boolean isPrivate) { this.isPrivate = isPrivate; }
 
     public List<String> getImageUrls() { return imageUrls; }
     public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }

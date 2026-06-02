@@ -19,6 +19,8 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
 
     List<Location> findByCreatedBy(UUID createdBy);
 
+    List<Location> findByCreatedByAndStatus(UUID createdBy, Location.Status status);
+
     @Query(
         value = """
             SELECT * FROM public.locations
