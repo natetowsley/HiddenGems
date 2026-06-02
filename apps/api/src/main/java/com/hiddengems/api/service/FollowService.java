@@ -5,7 +5,6 @@ import com.hiddengems.api.entity.Follow;
 import com.hiddengems.api.repository.FollowRepository;
 import com.hiddengems.api.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
