@@ -72,7 +72,9 @@ public class CollectionService {
         checkOwnership(collection, requesterId);
 
         collection.setTitle(request.title());
-        collection.setPrivate(request.isPrivate() != null && request.isPrivate());
+        if (request.isPrivate() != null) {
+            collection.setPrivate(request.isPrivate());
+        }
 
         return toResponse(collectionRepository.save(collection));
     }
