@@ -30,14 +30,19 @@ public class UserController {
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> updateUser(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateUserRequest request) {
-        return ResponseEntity.ok(userService.updateUser(id, request));
+            @Valid @RequestBody UpdateUserRequest request,
+            JwtAuthenticationToken auth) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(userService.updateUser(id, request, requesterId));
     }
 
     // DELETE /api/users/{id}
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
-        userService.deleteUser(id);
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable UUID id,
+            JwtAuthenticationToken auth) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        userService.deleteUser(id, requesterId);
         return ResponseEntity.noContent().build();
     }
 
