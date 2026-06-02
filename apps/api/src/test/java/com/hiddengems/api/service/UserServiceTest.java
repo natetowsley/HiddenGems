@@ -11,7 +11,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
+import java.lang.reflect.Field;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,10 +34,11 @@ class UserServiceTest {
     private UUID userId;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         userId = UUID.randomUUID();
         mockUser = new User("John Doe", "johndoe", "john@example.com");
         mockUser.setAvatarUrl("https://example.com/avatar.jpg");
+        setId(mockUser, userId);
     }
 
     // --- getById ---
@@ -82,16 +85,52 @@ class UserServiceTest {
     // --- updateUser ---
 
     @Test
-    void updateUser_whenUserExists_updatesAndReturnsUserResponse() {
+    void updateUser_asOwner_updatesSuccessfully() {
         UpdateUserRequest request = new UpdateUserRequest("Jane Doe", "https://example.com/new.jpg");
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
         when(userRepository.save(any(User.class))).thenReturn(mockUser);
 
-        UserResponse response = userService.updateUser(userId, request);
+        UserResponse response = userService.updateUser(userId, request, userId);
 
         assertThat(response).isNotNull();
-        verify(userRepository, times(1)).save(any(User.class));
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void updateUser_asAdmin_updatesSuccessfully() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        User adminUser = new User("Admin", "admin", "admin@example.com");
+        adminUser.setRole(User.Role.admin);
+        setId(adminUser, adminId);
+
+        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", null);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
+        when(userRepository.save(any(User.class))).thenReturn(mockUser);
+
+        UserResponse response = userService.updateUser(userId, request, adminId);
+
+        assertThat(response).isNotNull();
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void updateUser_asOtherUser_throwsAccessDeniedException() throws Exception {
+        UUID otherId = UUID.randomUUID();
+        User otherUser = new User("Other", "other", "other@example.com");
+        setId(otherUser, otherId);
+
+        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", null);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findById(otherId)).thenReturn(Optional.of(otherUser));
+
+        assertThatThrownBy(() -> userService.updateUser(userId, request, otherId))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
@@ -100,7 +139,7 @@ class UserServiceTest {
 
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.updateUser(userId, request))
+        assertThatThrownBy(() -> userService.updateUser(userId, request, userId))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessageContaining(userId.toString());
 
@@ -110,22 +149,60 @@ class UserServiceTest {
     // --- deleteUser ---
 
     @Test
-    void deleteUser_whenUserExists_deletesSuccessfully() {
-        when(userRepository.existsById(userId)).thenReturn(true);
+    void deleteUser_asOwner_deletesSuccessfully() {
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
 
-        userService.deleteUser(userId);
+        userService.deleteUser(userId, userId);
 
-        verify(userRepository, times(1)).deleteById(userId);
+        verify(userRepository).deleteById(userId);
+    }
+
+    @Test
+    void deleteUser_asAdmin_deletesSuccessfully() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        User adminUser = new User("Admin", "admin", "admin@example.com");
+        adminUser.setRole(User.Role.admin);
+        setId(adminUser, adminId);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
+
+        userService.deleteUser(userId, adminId);
+
+        verify(userRepository).deleteById(userId);
+    }
+
+    @Test
+    void deleteUser_asOtherUser_throwsAccessDeniedException() throws Exception {
+        UUID otherId = UUID.randomUUID();
+        User otherUser = new User("Other", "other", "other@example.com");
+        setId(otherUser, otherId);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findById(otherId)).thenReturn(Optional.of(otherUser));
+
+        assertThatThrownBy(() -> userService.deleteUser(userId, otherId))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(userRepository, never()).deleteById(any());
     }
 
     @Test
     void deleteUser_whenUserNotFound_throwsEntityNotFoundException() {
-        when(userRepository.existsById(userId)).thenReturn(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.deleteUser(userId))
+        assertThatThrownBy(() -> userService.deleteUser(userId, userId))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessageContaining(userId.toString());
 
         verify(userRepository, never()).deleteById(any());
+    }
+
+    // --- helpers ---
+
+    private void setId(User user, UUID id) throws Exception {
+        Field field = User.class.getDeclaredField("id");
+        field.setAccessible(true);
+        field.set(user, id);
     }
 }
