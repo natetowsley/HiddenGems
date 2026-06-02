@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -54,11 +55,14 @@ public class FollowService {
             throw new EntityNotFoundException("User not found: " + userId);
         }
 
-        return followRepository.findByFollowingId(userId)
+        List<UUID> followerIds = followRepository.findByFollowingId(userId)
                 .stream()
-                .map(f -> userRepository.findById(f.getFollowerId()))
-                .filter(java.util.Optional::isPresent)
-                .map(opt -> UserResponse.from(opt.get()))
+                .map(Follow::getFollowerId)
+                .collect(Collectors.toList());
+
+        return userRepository.findAllById(followerIds)
+                .stream()
+                .map(UserResponse::from)
                 .toList();
     }
 
@@ -68,11 +72,14 @@ public class FollowService {
             throw new EntityNotFoundException("User not found: " + userId);
         }
 
-        return followRepository.findByFollowerId(userId)
+        List<UUID> followingIds = followRepository.findByFollowerId(userId)
                 .stream()
-                .map(f -> userRepository.findById(f.getFollowingId()))
-                .filter(java.util.Optional::isPresent)
-                .map(opt -> UserResponse.from(opt.get()))
+                .map(Follow::getFollowingId)
+                .collect(Collectors.toList());
+
+        return userRepository.findAllById(followingIds)
+                .stream()
+                .map(UserResponse::from)
                 .toList();
     }
 }
