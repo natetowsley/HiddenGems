@@ -1,6 +1,6 @@
 package com.hiddengems.api.controller;
 
-import com.hiddengems.api.dto.user.UserResponse;
+import com.hiddengems.api.dto.user.PublicUserResponse;
 import com.hiddengems.api.service.FollowService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -43,13 +43,13 @@ public class FollowController {
 
     // GET /api/users/{id}/followers
     @GetMapping("/followers")
-    public ResponseEntity<List<UserResponse>> getFollowers(@PathVariable UUID id) {
+    public ResponseEntity<List<PublicUserResponse>> getFollowers(@PathVariable UUID id) {
         return ResponseEntity.ok(followService.getFollowers(id));
     }
 
     // GET /api/users/{id}/following
     @GetMapping("/following")
-    public ResponseEntity<List<UserResponse>> getFollowing(@PathVariable UUID id) {
+    public ResponseEntity<List<PublicUserResponse>> getFollowing(@PathVariable UUID id) {
         return ResponseEntity.ok(followService.getFollowing(id));
     }
 }

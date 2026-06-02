@@ -1,11 +1,10 @@
 package com.hiddengems.api.service;
 
-import com.hiddengems.api.dto.user.UserResponse;
+import com.hiddengems.api.dto.user.PublicUserResponse;
 import com.hiddengems.api.entity.Follow;
 import com.hiddengems.api.repository.FollowRepository;
 import com.hiddengems.api.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,30 +48,36 @@ public class FollowService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> getFollowers(UUID userId) {
+    public List<PublicUserResponse> getFollowers(UUID userId) {
         if (!userRepository.existsById(userId)) {
             throw new EntityNotFoundException("User not found: " + userId);
         }
 
-        return followRepository.findByFollowingId(userId)
+        List<UUID> followerIds = followRepository.findByFollowingId(userId)
                 .stream()
-                .map(f -> userRepository.findById(f.getFollowerId()))
-                .filter(java.util.Optional::isPresent)
-                .map(opt -> UserResponse.from(opt.get()))
+                .map(Follow::getFollowerId)
+                .toList();
+
+        return userRepository.findAllById(followerIds)
+                .stream()
+                .map(PublicUserResponse::from)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> getFollowing(UUID userId) {
+    public List<PublicUserResponse> getFollowing(UUID userId) {
         if (!userRepository.existsById(userId)) {
             throw new EntityNotFoundException("User not found: " + userId);
         }
 
-        return followRepository.findByFollowerId(userId)
+        List<UUID> followingIds = followRepository.findByFollowerId(userId)
                 .stream()
-                .map(f -> userRepository.findById(f.getFollowingId()))
-                .filter(java.util.Optional::isPresent)
-                .map(opt -> UserResponse.from(opt.get()))
+                .map(Follow::getFollowingId)
+                .toList();
+
+        return userRepository.findAllById(followingIds)
+                .stream()
+                .map(PublicUserResponse::from)
                 .toList();
     }
 }

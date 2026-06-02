@@ -1,5 +1,6 @@
 package com.hiddengems.api.controller;
 
+import com.hiddengems.api.dto.user.PublicUserResponse;
 import com.hiddengems.api.dto.user.UpdateUserRequest;
 import com.hiddengems.api.dto.user.UserResponse;
 import com.hiddengems.api.service.UserService;
@@ -22,22 +23,32 @@ public class UserController {
 
     // GET /api/users/{id}
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponse> getUserById(@PathVariable UUID id) {
-        return ResponseEntity.ok(userService.getById(id));
+    public ResponseEntity<?> getUserById(@PathVariable UUID id, JwtAuthenticationToken auth) {
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isAdmin) {
+            return ResponseEntity.ok(userService.getById(id));
+        }
+        return ResponseEntity.ok(userService.getPublicById(id));
     }
 
     // PUT /api/users/{id}
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> updateUser(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateUserRequest request) {
-        return ResponseEntity.ok(userService.updateUser(id, request));
+            @Valid @RequestBody UpdateUserRequest request,
+            JwtAuthenticationToken auth) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(userService.updateUser(id, request, requesterId));
     }
 
     // DELETE /api/users/{id}
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
-        userService.deleteUser(id);
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable UUID id,
+            JwtAuthenticationToken auth) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        userService.deleteUser(id, requesterId);
         return ResponseEntity.noContent().build();
     }
 
