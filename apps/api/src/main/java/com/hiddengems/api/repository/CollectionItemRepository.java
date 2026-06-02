@@ -17,4 +17,6 @@ public interface CollectionItemRepository extends JpaRepository<CollectionItem, 
     void deleteByCollectionIdAndLocationId(UUID collectionId, UUID locationId);
 
     void deleteAllByCollectionId(UUID collectionId);
+
+    void deleteAllByLocationId(UUID locationId);
 }
