@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -57,7 +56,7 @@ public class FollowService {
         List<UUID> followerIds = followRepository.findByFollowingId(userId)
                 .stream()
                 .map(Follow::getFollowerId)
-                .collect(Collectors.toList());
+                .toList();
 
         return userRepository.findAllById(followerIds)
                 .stream()
@@ -74,7 +73,7 @@ public class FollowService {
         List<UUID> followingIds = followRepository.findByFollowerId(userId)
                 .stream()
                 .map(Follow::getFollowingId)
-                .collect(Collectors.toList());
+                .toList();
 
         return userRepository.findAllById(followingIds)
                 .stream()
