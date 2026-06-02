@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -41,9 +43,22 @@ public class CollectionService {
 
     @Transactional(readOnly = true)
     public List<CollectionResponse> getByUser(UUID userId) {
-        return collectionRepository.findByUserId(userId)
+        List<Collection> collections = collectionRepository.findByUserId(userId);
+
+        List<UUID> collectionIds = collections.stream()
+                .map(Collection::getId)
+                .toList();
+
+        Map<UUID, List<UUID>> itemsByCollection = collectionItemRepository
+                .findByCollectionIdIn(collectionIds)
                 .stream()
-                .map(c -> toResponse(c))
+                .collect(Collectors.groupingBy(
+                        CollectionItem::getCollectionId,
+                        Collectors.mapping(CollectionItem::getLocationId, Collectors.toList())
+                ));
+
+        return collections.stream()
+                .map(c -> CollectionResponse.from(c, itemsByCollection.getOrDefault(c.getId(), List.of())))
                 .toList();
     }
 

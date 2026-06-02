@@ -12,6 +12,8 @@ public interface CollectionItemRepository extends JpaRepository<CollectionItem, 
 
     List<CollectionItem> findByCollectionId(UUID collectionId);
 
+    List<CollectionItem> findByCollectionIdIn(List<UUID> collectionIds);
+
     boolean existsByCollectionIdAndLocationId(UUID collectionId, UUID locationId);
 
     void deleteByCollectionIdAndLocationId(UUID collectionId, UUID locationId);
