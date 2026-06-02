@@ -1,5 +1,6 @@
 package com.hiddengems.api.controller;
 
+import com.hiddengems.api.dto.user.PublicUserResponse;
 import com.hiddengems.api.dto.user.UpdateUserRequest;
 import com.hiddengems.api.dto.user.UserResponse;
 import com.hiddengems.api.service.UserService;
@@ -22,8 +23,8 @@ public class UserController {
 
     // GET /api/users/{id}
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponse> getUserById(@PathVariable UUID id) {
-        return ResponseEntity.ok(userService.getById(id));
+    public ResponseEntity<PublicUserResponse> getUserById(@PathVariable UUID id) {
+        return ResponseEntity.ok(userService.getPublicById(id));
     }
 
     // PUT /api/users/{id}

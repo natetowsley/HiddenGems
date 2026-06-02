@@ -1,6 +1,6 @@
 package com.hiddengems.api.service;
 
-import com.hiddengems.api.dto.user.UserResponse;
+import com.hiddengems.api.dto.user.PublicUserResponse;
 import com.hiddengems.api.entity.Follow;
 import com.hiddengems.api.repository.FollowRepository;
 import com.hiddengems.api.repository.UserRepository;
@@ -48,7 +48,7 @@ public class FollowService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> getFollowers(UUID userId) {
+    public List<PublicUserResponse> getFollowers(UUID userId) {
         if (!userRepository.existsById(userId)) {
             throw new EntityNotFoundException("User not found: " + userId);
         }
@@ -60,12 +60,12 @@ public class FollowService {
 
         return userRepository.findAllById(followerIds)
                 .stream()
-                .map(UserResponse::from)
+                .map(PublicUserResponse::from)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> getFollowing(UUID userId) {
+    public List<PublicUserResponse> getFollowing(UUID userId) {
         if (!userRepository.existsById(userId)) {
             throw new EntityNotFoundException("User not found: " + userId);
         }
@@ -77,7 +77,7 @@ public class FollowService {
 
         return userRepository.findAllById(followingIds)
                 .stream()
-                .map(UserResponse::from)
+                .map(PublicUserResponse::from)
                 .toList();
     }
 }

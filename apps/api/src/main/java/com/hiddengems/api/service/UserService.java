@@ -1,5 +1,6 @@
 package com.hiddengems.api.service;
 
+import com.hiddengems.api.dto.user.PublicUserResponse;
 import com.hiddengems.api.dto.user.UpdateUserRequest;
 import com.hiddengems.api.dto.user.UserResponse;
 import com.hiddengems.api.entity.User;
@@ -26,6 +27,13 @@ public class UserService {
     public UserResponse getById(UUID id) {
         return userRepository.findById(id)
                 .map(UserResponse::from)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+    }
+
+    @Transactional(readOnly = true)
+    public PublicUserResponse getPublicById(UUID id) {
+        return userRepository.findById(id)
+                .map(PublicUserResponse::from)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
     }
 
