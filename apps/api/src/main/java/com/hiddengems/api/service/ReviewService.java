@@ -67,6 +67,10 @@ public class ReviewService {
         var location = locationRepository.findById(locationId)
                 .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
 
+        if (!hasLocationAccess(location, userId)) {
+            throw new AccessDeniedException("You do not have permission to access this location");
+        }
+
         if (location.getCreatedBy().equals(userId)) {
             throw new AccessDeniedException("You cannot review your own location");
         }
@@ -88,8 +92,11 @@ public class ReviewService {
     // Update
 
     public ReviewResponse updateReview(UUID locationId, UUID reviewId, UpdateReviewRequest request, UUID requesterId) {
-        if (!locationRepository.existsById(locationId)) {
-            throw new EntityNotFoundException("Location not found: " + locationId);
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        if (!hasLocationAccess(location, requesterId)) {
+            throw new AccessDeniedException("You do not have permission to access this location");
         }
 
         Review review = reviewRepository.findById(reviewId)
@@ -122,8 +129,11 @@ public class ReviewService {
     // Delete
 
     public void deleteReview(UUID locationId, UUID reviewId, UUID requesterId) {
-        if (!locationRepository.existsById(locationId)) {
-            throw new EntityNotFoundException("Location not found: " + locationId);
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        if (!hasLocationAccess(location, requesterId)) {
+            throw new AccessDeniedException("You do not have permission to access this location");
         }
 
         Review review = reviewRepository.findById(reviewId)
@@ -142,8 +152,11 @@ public class ReviewService {
     // Images
 
     public ReviewResponse addImage(UUID locationId, UUID reviewId, AddImageRequest request, UUID requesterId) {
-        if (!locationRepository.existsById(locationId)) {
-            throw new EntityNotFoundException("Location not found: " + locationId);
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        if (!hasLocationAccess(location, requesterId)) {
+            throw new AccessDeniedException("You do not have permission to access this location");
         }
 
         Review review = reviewRepository.findById(reviewId)
@@ -167,8 +180,11 @@ public class ReviewService {
     }
 
     public void removeImage(UUID locationId, UUID reviewId, String imageUrl, UUID requesterId) {
-        if (!locationRepository.existsById(locationId)) {
-            throw new EntityNotFoundException("Location not found: " + locationId);
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        if (!hasLocationAccess(location, requesterId)) {
+            throw new AccessDeniedException("You do not have permission to access this location");
         }
 
         Review review = reviewRepository.findById(reviewId)
@@ -193,8 +209,11 @@ public class ReviewService {
     // Votes
 
     public ReviewResponse castVote(UUID locationId, UUID reviewId, CastVoteRequest request, UUID userId) {
-        if (!locationRepository.existsById(locationId)) {
-            throw new EntityNotFoundException("Location not found: " + locationId);
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        if (!hasLocationAccess(location, userId)) {
+            throw new AccessDeniedException("You do not have permission to access this location");
         }
 
         Review review = reviewRepository.findById(reviewId)
@@ -237,8 +256,11 @@ public class ReviewService {
     }
 
     public void removeVote(UUID locationId, UUID reviewId, UUID userId) {
-        if (!locationRepository.existsById(locationId)) {
-            throw new EntityNotFoundException("Location not found: " + locationId);
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        if (!hasLocationAccess(location, userId)) {
+            throw new AccessDeniedException("You do not have permission to access this location");
         }
 
         Review review = reviewRepository.findById(reviewId)
