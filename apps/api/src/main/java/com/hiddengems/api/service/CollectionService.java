@@ -5,9 +5,11 @@ import com.hiddengems.api.dto.collection.CreateCollectionRequest;
 import com.hiddengems.api.dto.collection.UpdateCollectionRequest;
 import com.hiddengems.api.entity.Collection;
 import com.hiddengems.api.entity.CollectionItem;
+import com.hiddengems.api.entity.Location;
 import com.hiddengems.api.entity.User;
 import com.hiddengems.api.repository.CollectionItemRepository;
 import com.hiddengems.api.repository.CollectionRepository;
+import com.hiddengems.api.repository.LocationInviteRepository;
 import com.hiddengems.api.repository.LocationRepository;
 import com.hiddengems.api.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -27,17 +29,20 @@ public class CollectionService {
     private final CollectionRepository collectionRepository;
     private final CollectionItemRepository collectionItemRepository;
     private final LocationRepository locationRepository;
+    private final LocationInviteRepository locationInviteRepository;
     private final UserRepository userRepository;
 
     public CollectionService(
             CollectionRepository collectionRepository,
             CollectionItemRepository collectionItemRepository,
             LocationRepository locationRepository,
+            LocationInviteRepository locationInviteRepository,
             UserRepository userRepository
     ) {
         this.collectionRepository = collectionRepository;
         this.collectionItemRepository = collectionItemRepository;
         this.locationRepository = locationRepository;
+        this.locationInviteRepository = locationInviteRepository;
         this.userRepository = userRepository;
     }
 
@@ -142,8 +147,11 @@ public class CollectionService {
 
         checkOwnership(collection, requesterId);
 
-        if (!locationRepository.existsById(locationId)) {
-            throw new EntityNotFoundException("Location not found: " + locationId);
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+
+        if (!hasLocationAccess(location, requesterId)) {
+            throw new AccessDeniedException("You do not have permission to access this location");
         }
 
         if (collectionItemRepository.existsByCollectionIdAndLocationId(collectionId, locationId)) {
@@ -168,6 +176,14 @@ public class CollectionService {
     }
 
     // Helpers
+
+    private boolean hasLocationAccess(Location location, UUID requesterId) {
+        if (!location.isPrivate()) return true;
+        if (location.getCreatedBy().equals(requesterId)) return true;
+        User requester = userRepository.findById(requesterId).orElse(null);
+        if (requester != null && requester.getRole() == User.Role.admin) return true;
+        return locationInviteRepository.existsByLocationIdAndUserId(location.getId(), requesterId);
+    }
 
     private CollectionResponse toResponse(Collection collection) {
         List<UUID> locationIds = collectionItemRepository.findByCollectionId(collection.getId())
