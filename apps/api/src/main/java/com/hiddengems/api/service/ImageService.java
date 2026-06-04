@@ -40,6 +40,10 @@ public class ImageService {
         if (!publicUrl.startsWith(prefix)) {
             throw new IllegalArgumentException("URL does not belong to bucket: " + bucket);
         }
-        return publicUrl.substring(prefix.length());
+        String path = publicUrl.substring(prefix.length());
+        if (path.contains("..") || path.contains("//") || path.startsWith("/")) {
+            throw new IllegalArgumentException("Invalid image path");
+        }
+        return path;
     }
 }
