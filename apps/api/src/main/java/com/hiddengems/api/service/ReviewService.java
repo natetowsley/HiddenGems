@@ -5,9 +5,11 @@ import com.hiddengems.api.dto.review.CastVoteRequest;
 import com.hiddengems.api.dto.review.CreateReviewRequest;
 import com.hiddengems.api.dto.review.ReviewResponse;
 import com.hiddengems.api.dto.review.UpdateReviewRequest;
+import com.hiddengems.api.entity.Location;
 import com.hiddengems.api.entity.Review;
 import com.hiddengems.api.entity.ReviewVote;
 import com.hiddengems.api.entity.User;
+import com.hiddengems.api.repository.LocationInviteRepository;
 import com.hiddengems.api.repository.LocationRepository;
 import com.hiddengems.api.repository.ReviewRepository;
 import com.hiddengems.api.repository.ReviewVoteRepository;
@@ -17,6 +19,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,22 +34,26 @@ public class ReviewService {
     private final LocationRepository locationRepository;
     private final UserRepository userRepository;
     private final ReviewVoteRepository reviewVoteRepository;
+    private final LocationInviteRepository locationInviteRepository;
     private final ImageService imageService;
 
-    public ReviewService(ReviewRepository reviewRepository, LocationRepository locationRepository, UserRepository userRepository, ReviewVoteRepository reviewVoteRepository, ImageService imageService) {
+    public ReviewService(ReviewRepository reviewRepository, LocationRepository locationRepository, UserRepository userRepository, ReviewVoteRepository reviewVoteRepository, LocationInviteRepository locationInviteRepository, ImageService imageService) {
         this.reviewRepository = reviewRepository;
         this.locationRepository = locationRepository;
         this.userRepository = userRepository;
         this.reviewVoteRepository = reviewVoteRepository;
+        this.locationInviteRepository = locationInviteRepository;
         this.imageService = imageService;
     }
 
     // Find
 
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getByLocationId(UUID locationId) {
-        if (!locationRepository.existsById(locationId)) {
-            throw new EntityNotFoundException("Location not found: " + locationId);
+    public List<ReviewResponse> getByLocationId(UUID locationId, UUID requesterId) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + locationId));
+        if (!hasLocationAccess(location, requesterId)) {
+            throw new AccessDeniedException("You do not have permission to view reviews for this location");
         }
         return reviewRepository.findByLocationId(locationId)
                 .stream()
@@ -94,9 +101,17 @@ public class ReviewService {
 
         checkOwnership(review, requesterId);
 
+        List<String> newUrls = request.imageUrls() != null ? request.imageUrls() : List.of();
+        for (String url : review.getImageUrls()) {
+            if (!newUrls.contains(url)) {
+                String objectPath = imageService.extractPath(ImageService.REVIEW_BUCKET, url);
+                imageService.deleteFile(ImageService.REVIEW_BUCKET, objectPath);
+            }
+        }
+
         review.setRating(request.rating());
         review.setText(request.text());
-        review.setImageUrls(request.imageUrls() != null ? request.imageUrls() : List.of());
+        review.setImageUrls(newUrls);
 
         Review saved = reviewRepository.save(review);
         locationRepository.recalculateAvgRating(locationId);
@@ -246,6 +261,14 @@ public class ReviewService {
     }
 
     // Helpers
+
+    private boolean hasLocationAccess(Location location, UUID requesterId) {
+        if (!location.isPrivate()) return true;
+        if (location.getCreatedBy().equals(requesterId)) return true;
+        User user = userRepository.findById(requesterId).orElse(null);
+        if (user != null && user.getRole() == User.Role.admin) return true;
+        return locationInviteRepository.existsByLocationIdAndUserId(location.getId(), requesterId);
+    }
 
     private void checkOwnership(Review review, UUID requesterId) {
         if (review.getUserId().equals(requesterId)) {
