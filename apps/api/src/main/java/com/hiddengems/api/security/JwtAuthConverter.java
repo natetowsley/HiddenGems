@@ -1,8 +1,10 @@
 package com.hiddengems.api.security;
 
+import com.hiddengems.api.entity.User;
 import com.hiddengems.api.repository.UserRepository;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -26,12 +28,11 @@ public class JwtAuthConverter implements Converter<Jwt, AbstractAuthenticationTo
     public AbstractAuthenticationToken convert(Jwt jwt) {
         String userId = jwt.getSubject();
 
-        String role = userRepository.findById(UUID.fromString(userId))
-                .map(user -> user.getRole().name().toUpperCase())
-                .orElse("USER");
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new BadCredentialsException("Authenticated user has no registered account"));
 
         Collection<GrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority("ROLE_" + role)
+                new SimpleGrantedAuthority("ROLE_" + user.getRole().name().toUpperCase())
         );
 
         return new JwtAuthenticationToken(jwt, authorities, userId);
