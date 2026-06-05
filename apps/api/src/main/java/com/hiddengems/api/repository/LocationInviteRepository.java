@@ -18,4 +18,6 @@ public interface LocationInviteRepository extends JpaRepository<LocationInvite, 
     List<LocationInvite> findByLocationId(UUID locationId);
 
     void deleteAllByLocationId(UUID locationId);
+
+    void deleteAllByUserId(UUID userId);
 }

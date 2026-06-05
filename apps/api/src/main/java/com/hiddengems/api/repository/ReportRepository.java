@@ -12,4 +12,6 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
     boolean existsByReporterIdAndLocationId(UUID reporterId, UUID locationId);
 
     void deleteAllByLocationId(UUID locationId);
+
+    void deleteAllByReporterId(UUID reporterId);
 }

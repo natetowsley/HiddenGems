@@ -20,6 +20,8 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     void deleteAllByLocationId(UUID locationId);
 
+    void deleteAllByUserId(UUID userId);
+
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Review r SET r.upvotes = r.upvotes + 1 WHERE r.id = :id")
     void incrementUpvotes(@Param("id") UUID id);
