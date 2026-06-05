@@ -2,7 +2,7 @@
 .login-page {
   min-height: 100vh;
   display: flex;
-  background: #0e0c1a;
+  background: #0e2822;
   font-family: 'Outfit', sans-serif;
 }
 
@@ -15,45 +15,56 @@
   padding: 3rem;
   flex-direction: column;
   justify-content: space-between;
-  background: #0e0c1a;
+  background: #0e2822;
 }
 
 @media (min-width: 1024px) {
   .login-left { display: flex; }
 }
 
-/* ── Topographic rings ──────────────────────────── */
-.login-topo {
+/* ── Map dot grid ───────────────────────────────── */
+.map-grid {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0.2;
+  background-image: radial-gradient(circle, rgba(111, 207, 151, 0.18) 1px, transparent 1px);
+  background-size: 38px 38px;
+  pointer-events: none;
 }
 
-.topo-ring {
-  fill: none;
-  stroke: #7c5cfc;
-  stroke-width: 1;
-  transform-box: fill-box;
-  transform-origin: center;
+/* ── Map pins ───────────────────────────────────── */
+.map-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  z-index: 1;
 }
 
-.topo-ring:nth-child(odd)  { animation: topo-cw  var(--dur, 40s) linear infinite; }
-.topo-ring:nth-child(even) { animation: topo-ccw var(--dur, 50s) linear infinite; }
-.topo-ring:nth-child(1)  { --dur: 38s; }
-.topo-ring:nth-child(2)  { --dur: 52s; }
-.topo-ring:nth-child(3)  { --dur: 33s; }
-.topo-ring:nth-child(4)  { --dur: 58s; }
-.topo-ring:nth-child(5)  { --dur: 44s; }
-.topo-ring:nth-child(6)  { --dur: 62s; }
-.topo-ring:nth-child(7)  { --dur: 29s; }
-.topo-ring:nth-child(8)  { --dur: 70s; }
-.topo-ring:nth-child(9)  { --dur: 48s; }
-.topo-ring:nth-child(10) { --dur: 76s; }
+.map-pin__icon {
+  width: 18px;
+  height: 24px;
+  display: block;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 2px 6px rgba(111, 207, 151, 0.4));
+}
 
-@keyframes topo-cw  { to { transform: rotate(360deg);  } }
-@keyframes topo-ccw { to { transform: rotate(-360deg); } }
+.map-pin__pulse {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid #6FCF97;
+  transform: translate(-50%, -50%) scale(0.2);
+  opacity: 0;
+  animation: pin-pulse 3s ease-out infinite;
+}
+
+@keyframes pin-pulse {
+  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0.6; }
+  70%  { opacity: 0.1; }
+  100% { transform: translate(-50%, -50%) scale(4);   opacity: 0;   }
+}
 
 /* ── Grain overlay ──────────────────────────────── */
 .login-grain {
@@ -88,7 +99,7 @@
 }
 
 .login-wordmark {
-  color: #7c5cfc;
+  color: #6FCF97;
   font-size: 11px;
   letter-spacing: 0.2em;
   font-weight: 500;
@@ -99,25 +110,25 @@
   font-size: clamp(44px, 4.8vw, 70px);
   font-weight: 800;
   line-height: 0.95;
-  color: #f0ecff;
+  color: #EEEEEE;
   letter-spacing: -1px;
   margin: 0 0 1.5rem;
 }
 
 .login-headline em {
   font-style: normal;
-  color: #7c5cfc;
+  color: #6FCF97;
 }
 
 .login-subtext {
-  color: #6a6090;
+  color: #1F6F5F;
   font-size: 14px;
   line-height: 1.7;
   margin: 0;
 }
 
 .login-coords {
-  color: #2e2a4a;
+  color: #1F6F5F;
   font-size: 10px;
   letter-spacing: 0.22em;
 }
@@ -129,8 +140,8 @@
   justify-content: center;
   width: 100%;
   padding: 3rem 2rem;
-  background: #0b0917;
-  border-left: 1px solid #1c1730;
+  background: #0b2018;
+  border-left: 1px solid #1a3e30;
 }
 
 @media (min-width: 1024px) {
@@ -168,13 +179,13 @@
   font-family: 'Syne', sans-serif;
   font-size: 28px;
   font-weight: 700;
-  color: #f0ecff;
+  color: #EEEEEE;
   letter-spacing: -0.3px;
   margin: 0 0 0.35rem;
 }
 
 .login-form-sub {
-  color: #5a5080;
+  color: #1F6F5F;
   font-size: 13px;
   margin: 0;
 }
@@ -193,7 +204,7 @@
 }
 
 .login-label {
-  color: #3e3862;
+  color: #1F6F5F;
   font-size: 10px;
   letter-spacing: 0.14em;
   font-weight: 500;
@@ -201,11 +212,11 @@
 
 .login-input {
   width: 100%;
-  background: #090714;
-  border: 1px solid #18152a;
+  background: #081812;
+  border: 1px solid #163428;
   border-radius: 6px;
   padding: 10px 13px;
-  color: #f0ecff;
+  color: #EEEEEE;
   font-size: 14px;
   font-family: 'Outfit', sans-serif;
   outline: none;
@@ -214,19 +225,19 @@
 }
 
 .login-input::placeholder {
-  color: #1e1a30;
+  color: #0f2e22;
 }
 
 .login-input:focus {
-  border-color: #7c5cfc;
-  box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.12);
+  border-color: #6FCF97;
+  box-shadow: 0 0 0 3px rgba(111, 207, 151, 0.12);
 }
 
 /* ── Submit button ──────────────────────────────── */
 .login-submit {
   width: 100%;
-  background: #ff6b35;
-  color: #fff;
+  background: #2FA084;
+  color: #EEEEEE;
   border: none;
   border-radius: 6px;
   padding: 11px;
@@ -239,7 +250,7 @@
   margin-top: 0.3rem;
 }
 
-.login-submit:hover:not(:disabled) { background: #ff7d4a; }
+.login-submit:hover:not(:disabled) { background: #36b894; }
 .login-submit:active:not(:disabled) { transform: translateY(1px); }
 .login-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -254,17 +265,17 @@
 .login-cta {
   text-align: center;
   margin-top: 1.5rem;
-  color: #3e3862;
+  color: #1F6F5F;
   font-size: 13px;
 }
 
 .login-cta a {
-  color: #7c5cfc;
+  color: #6FCF97;
   text-decoration: none;
   transition: color 0.18s;
 }
 
-.login-cta a:hover { color: #9b8cff; }
+.login-cta a:hover { color: #8edaaa; }
 
 /* ── Shared animation ───────────────────────────── */
 @keyframes fade-up {

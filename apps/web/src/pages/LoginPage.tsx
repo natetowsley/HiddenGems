@@ -3,42 +3,43 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import './LoginPage.css'
 
-const TOPO_RINGS = [
-  { rx: 58,  ry: 36  },
-  { rx: 108, ry: 64  },
-  { rx: 162, ry: 92  },
-  { rx: 216, ry: 124 },
-  { rx: 272, ry: 154 },
-  { rx: 328, ry: 186 },
-  { rx: 384, ry: 216 },
-  { rx: 438, ry: 248 },
-  { rx: 490, ry: 278 },
-  { rx: 540, ry: 308 },
+const MAP_PINS = [
+  { top: '18%', left: '22%', delay: 0   },
+  { top: '30%', left: '70%', delay: 1.4 },
+  { top: '54%', left: '38%', delay: 2.8 },
+  { top: '46%', left: '72%', delay: 4.2 },
+  { top: '74%', left: '55%', delay: 5.6 },
 ]
 
-function TopoLines() {
+function MapPin({ top, left, delay }: { top: string; left: string; delay: number }) {
   return (
-    <svg
-      className="login-topo"
-      viewBox="0 0 800 800"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
-      <g transform="translate(400 400)">
-        {TOPO_RINGS.map((r, i) => (
-          <ellipse key={i} className="topo-ring" rx={r.rx} ry={r.ry} />
-        ))}
-      </g>
-    </svg>
+    <div className="map-pin" style={{ top, left }}>
+      <div className="map-pin__pulse" style={{ animationDelay: `${delay}s` }} />
+      <svg className="map-pin__icon" viewBox="0 0 20 26" fill="none" aria-hidden="true">
+        <path d="M10 0C4.477 0 0 4.477 0 10c0 7.333 10 16 10 16S20 17.333 20 10C20 4.477 15.523 0 10 0z" fill="#6FCF97" fillOpacity="0.75" />
+        <circle cx="10" cy="10" r="3.5" fill="#0e2822" fillOpacity="0.6" />
+      </svg>
+    </div>
+  )
+}
+
+function MapBackground() {
+  return (
+    <>
+      <div className="map-grid" aria-hidden="true" />
+      {MAP_PINS.map((p, i) => (
+        <MapPin key={i} top={p.top} left={p.left} delay={p.delay} />
+      ))}
+    </>
   )
 }
 
 function GemMark() {
   return (
     <svg width="16" height="20" viewBox="0 0 16 20" fill="none" aria-hidden="true">
-      <polygon points="8,1 15,7 8,19 1,7" fill="#7c5cfc" fillOpacity="0.92" />
-      <polygon points="1,7 15,7 8,13" fill="#0e0c1a" fillOpacity="0.28" />
-      <line x1="1" y1="7" x2="15" y2="7" stroke="#b8a8ff" strokeWidth="0.6" strokeOpacity="0.4" />
+      <polygon points="8,1 15,7 8,19 1,7" fill="#6FCF97" fillOpacity="0.92" />
+      <polygon points="1,7 15,7 8,13" fill="#0e2822" fillOpacity="0.3" />
+      <line x1="1" y1="7" x2="15" y2="7" stroke="#EEEEEE" strokeWidth="0.6" strokeOpacity="0.3" />
     </svg>
   )
 }
@@ -70,7 +71,7 @@ export default function LoginPage() {
 
       {/* ── Left: branding panel ── */}
       <div className="login-left">
-        <TopoLines />
+        <MapBackground />
         <div className="login-grain" />
 
         <header className="login-left__header">
@@ -80,7 +81,7 @@ export default function LoginPage() {
 
         <main className="login-left__main">
           <h1 className="login-headline">
-            Find what<br />
+            Find spots<br />
             <em>nobody<br />talks about</em>
           </h1>
           <p className="login-subtext">
