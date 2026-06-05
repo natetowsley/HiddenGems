@@ -28,8 +28,12 @@ public class ReviewController {
 
     // GET /api/locations/{locationId}/reviews
     @GetMapping
-    public ResponseEntity<List<ReviewResponse>> getReviews(@PathVariable UUID locationId) {
-        return ResponseEntity.ok(reviewService.getByLocationId(locationId));
+    public ResponseEntity<List<ReviewResponse>> getReviews(
+            @PathVariable UUID locationId,
+            JwtAuthenticationToken auth
+    ) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(reviewService.getByLocationId(locationId, requesterId));
     }
 
     // POST /api/locations/{locationId}/reviews
