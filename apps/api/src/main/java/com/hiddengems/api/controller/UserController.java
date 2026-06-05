@@ -33,9 +33,11 @@ public class UserController {
     // GET /api/users/{id}
     @GetMapping("/{id}")
     public ResponseEntity<?> getUserById(@PathVariable UUID id, JwtAuthenticationToken auth) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        boolean isSelf = id.equals(requesterId);
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (isAdmin) {
+        if (isSelf || isAdmin) {
             return ResponseEntity.ok(userService.getById(id));
         }
         return ResponseEntity.ok(userService.getPublicById(id));
