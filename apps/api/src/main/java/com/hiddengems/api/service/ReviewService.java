@@ -79,9 +79,14 @@ public class ReviewService {
             throw new IllegalStateException("You have already reviewed this location");
         }
 
+        List<String> imageUrls = request.imageUrls() != null ? request.imageUrls() : List.of();
+        if (imageUrls.size() > MAX_IMAGES) {
+            throw new IllegalStateException("Review can have at most " + MAX_IMAGES + " images");
+        }
+
         Review review = new Review(userId, locationId, request.rating());
         review.setText(request.text());
-        review.setImageUrls(request.imageUrls() != null ? request.imageUrls() : List.of());
+        review.setImageUrls(imageUrls);
 
         Review saved = reviewRepository.save(review);
         locationRepository.recalculateAvgRating(locationId);
@@ -106,6 +111,9 @@ public class ReviewService {
         checkOwnership(review, requesterId);
 
         List<String> newUrls = request.imageUrls() != null ? request.imageUrls() : List.of();
+        if (newUrls.size() > MAX_IMAGES) {
+            throw new IllegalStateException("Review can have at most " + MAX_IMAGES + " images");
+        }
         for (String url : review.getImageUrls()) {
             if (!newUrls.contains(url)) {
                 String objectPath = imageService.extractPath(ImageService.REVIEW_BUCKET, url);
