@@ -22,20 +22,27 @@
   .login-left { display: flex; }
 }
 
-/* ── Map dot grid ───────────────────────────────── */
-.map-grid {
+/* ── Real map canvas ────────────────────────────── */
+.map-canvas {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, rgba(111, 207, 151, 0.18) 1px, transparent 1px);
-  background-size: 38px 38px;
-  pointer-events: none;
 }
 
-/* ── Map pins ───────────────────────────────────── */
+/* ── Map pins (rendered inside react-map-gl Marker) */
 .map-pin {
-  position: absolute;
-  transform: translate(-50%, -100%);
+  position: relative;
   z-index: 1;
+}
+
+/* ── MapLibre attribution — match dark theme ────── */
+.map-canvas .maplibregl-ctrl-attrib {
+  background: rgba(14, 40, 34, 0.7) !important;
+  border-radius: 4px;
+}
+
+.map-canvas .maplibregl-ctrl-attrib a,
+.map-canvas .maplibregl-ctrl-attrib-button {
+  color: #1F6F5F !important;
 }
 
 .map-pin__icon {

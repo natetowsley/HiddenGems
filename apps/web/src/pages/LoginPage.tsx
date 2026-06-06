@@ -1,19 +1,23 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import Map, { Marker } from 'react-map-gl/maplibre'
 import { supabase } from '@/lib/supabase'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import './LoginPage.css'
 
+const INITIAL_VIEW = { longitude: -122.4194, latitude: 37.7749, zoom: 11.5 }
+
 const MAP_PINS = [
-  { top: '18%', left: '22%', delay: 0   },
-  { top: '30%', left: '70%', delay: 1.4 },
-  { top: '54%', left: '38%', delay: 2.8 },
-  { top: '46%', left: '72%', delay: 4.2 },
-  { top: '74%', left: '55%', delay: 5.6 },
+  { longitude: -122.4680, latitude: 37.7022, delay: 0   },
+  { longitude: -122.4999, latitude: 37.7649, delay: 1.4 },
+  { longitude: -122.4347, latitude: 37.7544, delay: 2.8 },
+  { longitude: -122.3956, latitude: 37.7777, delay: 4.2 },
+  { longitude: -122.4833, latitude: 37.7900, delay: 5.6 },
 ]
 
-function MapPin({ top, left, delay }: { top: string; left: string; delay: number }) {
+function MapPin({ delay }: { delay: number }) {
   return (
-    <div className="map-pin" style={{ top, left }}>
+    <div className="map-pin">
       <div className="map-pin__pulse" style={{ animationDelay: `${delay}s` }} />
       <svg className="map-pin__icon" viewBox="0 0 20 26" fill="none" aria-hidden="true">
         <path d="M10 0C4.477 0 0 4.477 0 10c0 7.333 10 16 10 16S20 17.333 20 10C20 4.477 15.523 0 10 0z" fill="#6FCF97" fillOpacity="0.75" />
@@ -25,12 +29,24 @@ function MapPin({ top, left, delay }: { top: string; left: string; delay: number
 
 function MapBackground() {
   return (
-    <>
-      <div className="map-grid" aria-hidden="true" />
-      {MAP_PINS.map((p, i) => (
-        <MapPin key={i} top={p.top} left={p.left} delay={p.delay} />
-      ))}
-    </>
+    <div className="map-canvas" aria-hidden="true">
+      <Map
+        initialViewState={INITIAL_VIEW}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle={`https://api.maptiler.com/maps/dataviz-dark/style.json?key=${import.meta.env.VITE_MAPTILER_KEY}`}
+        scrollZoom={false}
+        dragPan={false}
+        touchZoomRotate={false}
+        doubleClickZoom={false}
+        keyboard={false}
+      >
+        {MAP_PINS.map((pin, i) => (
+          <Marker key={i} longitude={pin.longitude} latitude={pin.latitude} anchor="bottom">
+            <MapPin delay={pin.delay} />
+          </Marker>
+        ))}
+      </Map>
+    </div>
   )
 }
 
