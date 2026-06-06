@@ -154,7 +154,16 @@ export default function LocationSheet({ location, onClose }: Props) {
               >
                 {CATEGORY_LABEL[loc.category]}
               </span>
-              <span className={`ls-status-badge ${loc.status}`}>{loc.status}</span>
+              {loc.status === 'pending' ? (
+                <span className="ls-pending-tooltip-wrap">
+                  <span className="ls-status-badge pending">pending</span>
+                  <span className="ls-pending-tooltip">
+                    Only you can see this location. It won't be visible to others until it is verified.
+                  </span>
+                </span>
+              ) : (
+                <span className={`ls-status-badge ${loc.status}`}>{loc.status}</span>
+              )}
               {loc.isPrivate && <span className="ls-private-badge">Private</span>}
             </div>
 

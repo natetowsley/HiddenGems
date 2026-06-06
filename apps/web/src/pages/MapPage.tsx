@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre'
+import Map, { Marker, NavigationControl, type MapRef } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import Supercluster, { type ClusterFeature, type PointFeature } from 'supercluster'
 import { apiGet } from '@/api/client'
 import type { LocationCategory, LocationResponse, LocationStatus } from '@/types'
 import LocationSheet from '@/components/LocationSheet'
@@ -127,13 +128,49 @@ function LocationMarker({ category, name, status, onClick }: {
   )
 }
 
+function isCluster(f: ClusterFeature<object> | PointFeature<object>): f is ClusterFeature<object> {
+  return (f.properties as { cluster?: boolean }).cluster === true
+}
+
+function ClusterMarker({ count, onClick }: { count: number; onClick: () => void }) {
+  const size = Math.round(Math.min(54, 30 + Math.log2(count + 1) * 7))
+  return (
+    <div
+      onClick={e => { e.stopPropagation(); onClick() }}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'rgba(9, 26, 19, 0.93)',
+        border: '1.5px solid rgba(111, 207, 151, 0.45)',
+        boxShadow: '0 3px 18px rgba(0,0,0,0.6), 0 0 0 4px rgba(111, 207, 151, 0.07)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        fontFamily: 'Outfit, sans-serif',
+        fontSize: Math.round(size * 0.33),
+        fontWeight: 700,
+        color: '#6FCF97',
+        letterSpacing: '-0.02em',
+        userSelect: 'none',
+      }}
+    >
+      {count}
+    </div>
+  )
+}
+
 type HoverCoords = { lat: number; lng: number; x: number; y: number }
 
 export default function MapPage() {
+  const mapRef = useRef<MapRef>(null)
+
   const [selectedLocation, setSelectedLocation] = useState<LocationResponse | null>(null)
   const [placingPin, setPlacingPin]             = useState(false)
   const [hoverCoords, setHoverCoords]           = useState<HoverCoords | null>(null)
   const [pendingCoords, setPendingCoords]       = useState<{ lat: number; lng: number } | null>(null)
+  const [viewState, setViewState]               = useState(INITIAL_VIEW)
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -157,6 +194,31 @@ export default function MapPage() {
   })
 
   const locations = [...allLocations, ...mine.filter(l => l.status === 'pending')]
+
+  const supercluster = useMemo(() => {
+    const sc = new Supercluster<LocationResponse>({ radius: 60, maxZoom: 15 })
+    sc.load(locations.map(loc => ({
+      type: 'Feature' as const,
+      properties: { ...loc },
+      geometry: { type: 'Point' as const, coordinates: [loc.lng, loc.lat] },
+    })))
+    return sc
+  }, [locations])
+
+  const clusters = useMemo(() => {
+    const map = mapRef.current
+    if (!map) return locations.map(loc => ({
+      type: 'Feature' as const,
+      properties: { ...loc },
+      geometry: { type: 'Point' as const, coordinates: [loc.lng, loc.lat] },
+    }))
+    const bounds = map.getBounds()
+    if (!bounds) return []
+    return supercluster.getClusters(
+      [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()],
+      Math.floor(viewState.zoom),
+    )
+  }, [supercluster, viewState])
 
   function handleMapClick(e: { lngLat: { lat: number; lng: number } }) {
     if (placingPin) {
@@ -185,6 +247,7 @@ export default function MapPage() {
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <Map
+        ref={mapRef}
         initialViewState={INITIAL_VIEW}
         style={{ width: '100%', height: '100%' }}
         mapStyle={MAP_STYLE}
@@ -192,24 +255,38 @@ export default function MapPage() {
         onClick={handleMapClick}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverCoords(null)}
+        onMove={e => setViewState(e.viewState)}
       >
         <NavigationControl position="bottom-right" />
 
-        {locations.map(loc => (
-          <Marker
-            key={loc.id}
-            longitude={loc.lng}
-            latitude={loc.lat}
-            anchor="bottom"
-          >
-            <LocationMarker
-              category={loc.category}
-              name={loc.name}
-              status={loc.status}
-              onClick={() => !placingPin && setSelectedLocation(loc)}
-            />
-          </Marker>
-        ))}
+        {clusters.map((feature, i) => {
+          const [lng, lat] = feature.geometry.coordinates
+          if (isCluster(feature)) {
+            const { point_count: count, cluster_id: clusterId } = feature.properties as { point_count: number; cluster_id: number }
+            return (
+              <Marker key={`cluster-${i}`} longitude={lng} latitude={lat} anchor="center">
+                <ClusterMarker
+                  count={count}
+                  onClick={() => {
+                    const expansionZoom = Math.min(supercluster.getClusterExpansionZoom(clusterId), 20)
+                    mapRef.current?.easeTo({ center: [lng, lat], zoom: expansionZoom, duration: 450 })
+                  }}
+                />
+              </Marker>
+            )
+          }
+          const loc = feature.properties as LocationResponse
+          return (
+            <Marker key={loc.id} longitude={lng} latitude={lat} anchor="bottom">
+              <LocationMarker
+                category={loc.category}
+                name={loc.name}
+                status={loc.status}
+                onClick={() => !placingPin && setSelectedLocation(loc)}
+              />
+            </Marker>
+          )
+        })}
       </Map>
 
       {/* Placement mode hint bar */}
