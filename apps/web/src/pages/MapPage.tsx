@@ -61,15 +61,18 @@ const CATEGORY_ICON: Record<LocationCategory, React.ReactNode> = {
   ),
 }
 
-function LocationMarker({ category, name, status, onClick }: {
+function LocationMarker({ category, name, status, avgRating, description, onClick }: {
   category: LocationCategory
   name: string
   status: LocationStatus
+  avgRating: number
+  description: string | null
   onClick: () => void
 }) {
   const [hovered, setHovered] = useState(false)
   const color = CATEGORY_COLOR[category]
   const pending = status === 'pending'
+  const snippet = description ? description.slice(0, 48) + (description.length > 48 ? '…' : '') : null
 
   return (
     <div
@@ -88,22 +91,32 @@ function LocationMarker({ category, name, status, onClick }: {
           background: 'rgba(14, 40, 34, 0.92)',
           border: `1px solid ${color}33`,
           borderRadius: 6,
-          padding: '5px 10px',
+          padding: '7px 11px',
           whiteSpace: 'nowrap',
           fontFamily: 'Outfit, sans-serif',
           pointerEvents: 'none',
         }}>
           <div style={{ color: '#EEEEEE', fontSize: 12, fontWeight: 600 }}>{name}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
             <span style={{ color, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
               {category.replace(/_/g, ' ')}
             </span>
+            <span style={{ color: '#1e3b30', fontSize: 9 }}>·</span>
+            <span style={{ color: '#F5A623', fontSize: 10, letterSpacing: '0.04em' }}>
+              {'★'.repeat(Math.round(avgRating))}{'☆'.repeat(5 - Math.round(avgRating))}
+            </span>
+            <span style={{ color: '#556a62', fontSize: 10 }}>{avgRating.toFixed(1)}</span>
             {pending && (
               <span style={{ color: '#F5A623', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                 · pending
               </span>
             )}
           </div>
+          {snippet && (
+            <div style={{ color: '#556a62', fontSize: 10.5, marginTop: 4, maxWidth: 200, whiteSpace: 'normal', lineHeight: 1.45 }}>
+              {snippet}
+            </div>
+          )}
         </div>
       )}
       <svg
@@ -282,6 +295,8 @@ export default function MapPage() {
                 category={loc.category}
                 name={loc.name}
                 status={loc.status}
+                avgRating={loc.avgRating}
+                description={loc.description}
                 onClick={() => !placingPin && setSelectedLocation(loc)}
               />
             </Marker>
