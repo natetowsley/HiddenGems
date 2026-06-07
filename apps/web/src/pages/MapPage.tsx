@@ -5,61 +5,14 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster, { type ClusterFeature, type PointFeature } from 'supercluster'
 import { apiGet } from '@/api/client'
 import type { LocationCategory, LocationResponse, LocationStatus } from '@/types'
+import { CATEGORY_COLOR, CATEGORY_ICON } from '@/lib/mapConstants'
 import LocationSheet from '@/components/LocationSheet'
 import AddLocationSheet from '@/components/AddLocationSheet'
+import MapPanel from '@/components/MapPanel'
 
 const MAP_STYLE = `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${import.meta.env.VITE_MAPTILER_KEY}`
 
 const INITIAL_VIEW = { longitude: -98.5795, latitude: 39.8283, zoom: 4 }
-
-const CATEGORY_COLOR: Record<LocationCategory, string> = {
-  study_spot: '#7EB8F7',
-  food:       '#F5A623',
-  scenic:     '#6FCF97',
-  hangout:    '#B88EF0',
-  trail:      '#C4956A',
-  activity:   '#F06B6B',
-  other:      '#8899AA',
-}
-
-const CATEGORY_ICON: Record<LocationCategory, React.ReactNode> = {
-  scenic: (
-    <path d="M16 10L23 21H9L16 10Z" fill="white" fillOpacity="0.92" />
-  ),
-  food: (
-    <g stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none">
-      <line x1="16" y1="11" x2="16" y2="22" />
-      <line x1="13" y1="11" x2="13" y2="15" />
-      <line x1="19" y1="11" x2="19" y2="15" />
-      <path d="M13 15Q16 16.5 19 15" />
-    </g>
-  ),
-  study_spot: (
-    <g stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none">
-      <path d="M16 11C14 10 11 10.5 10 12L10 22C11 20.5 14 20 16 21" />
-      <path d="M16 11C18 10 21 10.5 22 12L22 22C21 20.5 18 20 16 21" />
-      <line x1="16" y1="11" x2="16" y2="21" />
-    </g>
-  ),
-  hangout: (
-    <g fill="white" fillOpacity="0.92">
-      <circle cx="16" cy="12" r="3" />
-      <path d="M10 22C10 18.5 12.7 16 16 16S22 18.5 22 22Z" />
-    </g>
-  ),
-  trail: (
-    <g fill="white" fillOpacity="0.92">
-      <ellipse cx="13" cy="13" rx="2.2" ry="3.2" transform="rotate(-20 13 13)" />
-      <ellipse cx="20" cy="20" rx="2.2" ry="3.2" transform="rotate(20 20 20)" />
-    </g>
-  ),
-  activity: (
-    <path d="M18 10H13.5L11 17H15L12.5 23L22 14H17.5L18 10Z" fill="white" fillOpacity="0.92" />
-  ),
-  other: (
-    <path d="M16 10L17.5 15L22 16L17.5 17L16 22L14.5 17L10 16L14.5 15Z" fill="white" fillOpacity="0.92" />
-  ),
-}
 
 function LocationMarker({ category, name, status, avgRating, description, onClick, onHoverChange }: {
   category: LocationCategory
@@ -125,7 +78,7 @@ function LocationMarker({ category, name, status, avgRating, description, onClic
         height="44"
         viewBox="0 0 32 44"
         fill="none"
-        style={{ cursor: 'pointer', filter: `drop-shadow(0 3px 10px ${color}${pending ? '33' : '55'})`, display: 'block' }}
+        style={{ cursor: 'pointer', filter: `drop-shadow(0 3px 10px ${color}${pending ? '33' : '55'})`, display: 'block', color: 'white' }}
       >
         <path
           d="M16 2C8.268 2 2 8.268 2 16C2 26 16 43 16 43C16 43 30 26 30 16C30 8.268 23.732 2 16 2Z"
@@ -180,12 +133,15 @@ type HoverCoords = { lat: number; lng: number; x: number; y: number }
 export default function MapPage() {
   const mapRef = useRef<MapRef>(null)
 
-  const [selectedLocation, setSelectedLocation] = useState<LocationResponse | null>(null)
-  const [placingPin, setPlacingPin]             = useState(false)
-  const [hoverCoords, setHoverCoords]           = useState<HoverCoords | null>(null)
-  const [pendingCoords, setPendingCoords]       = useState<{ lat: number; lng: number } | null>(null)
-  const [viewState, setViewState]               = useState(INITIAL_VIEW)
-  const [hoveredPinId, setHoveredPinId]         = useState<string | null>(null)
+  const [selectedLocation, setSelectedLocation]     = useState<LocationResponse | null>(null)
+  const [placingPin, setPlacingPin]                 = useState(false)
+  const [hoverCoords, setHoverCoords]               = useState<HoverCoords | null>(null)
+  const [pendingCoords, setPendingCoords]           = useState<{ lat: number; lng: number } | null>(null)
+  const [viewState, setViewState]                   = useState(INITIAL_VIEW)
+  const [hoveredPinId, setHoveredPinId]             = useState<string | null>(null)
+  const [panelOpen, setPanelOpen]                   = useState(false)
+  const [selectedCategories, setSelectedCategories] = useState<Set<LocationCategory>>(new Set())
+  const [minRating, setMinRating]                   = useState(0)
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -210,19 +166,25 @@ export default function MapPage() {
 
   const locations = [...allLocations, ...mine.filter(l => l.status === 'pending')]
 
+  const filteredLocations = useMemo(() => locations.filter(loc => {
+    if (selectedCategories.size > 0 && !selectedCategories.has(loc.category)) return false
+    if (minRating > 0 && loc.avgRating < minRating) return false
+    return true
+  }), [locations, selectedCategories, minRating])
+
   const supercluster = useMemo(() => {
     const sc = new Supercluster<LocationResponse>({ radius: 60, maxZoom: 15 })
-    sc.load(locations.map(loc => ({
+    sc.load(filteredLocations.map(loc => ({
       type: 'Feature' as const,
       properties: { ...loc },
       geometry: { type: 'Point' as const, coordinates: [loc.lng, loc.lat] },
     })))
     return sc
-  }, [locations])
+  }, [filteredLocations])
 
   const clusters = useMemo(() => {
     const map = mapRef.current
-    if (!map) return locations.map(loc => ({
+    if (!map) return filteredLocations.map(loc => ({
       type: 'Feature' as const,
       properties: { ...loc },
       geometry: { type: 'Point' as const, coordinates: [loc.lng, loc.lat] },
@@ -233,7 +195,7 @@ export default function MapPage() {
       [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()],
       Math.floor(viewState.zoom),
     )
-  }, [supercluster, viewState])
+  }, [supercluster, viewState, filteredLocations])
 
   function handleMapClick(e: { lngLat: { lat: number; lng: number } }) {
     if (placingPin) {
@@ -312,6 +274,66 @@ export default function MapPage() {
           )
         })}
       </Map>
+
+      <MapPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        selectedCategories={selectedCategories}
+        minRating={minRating}
+        onCategoryToggle={cat => setSelectedCategories(prev => {
+          const next = new Set(prev)
+          next.has(cat) ? next.delete(cat) : next.add(cat)
+          return next
+        })}
+        onMinRatingChange={setMinRating}
+        onClear={() => { setSelectedCategories(new Set()); setMinRating(0) }}
+        onFlyTo={(lng, lat, zoom) => mapRef.current?.flyTo({ center: [lng, lat], zoom, duration: 600 })}
+      />
+
+      {/* Filter toggle button */}
+      {!placingPin && (
+        <button
+          onClick={() => setPanelOpen(p => !p)}
+          title="Filters"
+          style={{
+            position: 'fixed',
+            bottom: '5.5rem',
+            left: '1.5rem',
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            background: panelOpen ? 'rgba(111, 207, 151, 0.12)' : 'rgba(6, 15, 11, 0.9)',
+            border: `1px solid ${panelOpen ? 'rgba(111, 207, 151, 0.5)' : 'rgba(111, 207, 151, 0.22)'}`,
+            color: '#6FCF97',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 30,
+            transition: 'background 0.2s, border-color 0.2s',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          }}
+        >
+          {/* Active filter dot */}
+          {(selectedCategories.size > 0 || minRating > 0) && (
+            <div style={{
+              position: 'absolute',
+              top: 7,
+              right: 7,
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: '#6FCF97',
+              border: '1.5px solid rgba(6,15,11,0.9)',
+            }} />
+          )}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="6" y1="12" x2="18" y2="12" />
+            <line x1="9" y1="18" x2="15" y2="18" />
+          </svg>
+        </button>
+      )}
 
       {/* Placement mode hint bar */}
       {placingPin && (
