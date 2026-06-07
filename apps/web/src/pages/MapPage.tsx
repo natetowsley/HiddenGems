@@ -1,0 +1,448 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import Map, { Marker, NavigationControl, type MapRef } from 'react-map-gl/maplibre'
+import 'maplibre-gl/dist/maplibre-gl.css'
+import Supercluster, { type ClusterFeature, type PointFeature } from 'supercluster'
+import { apiGet } from '@/api/client'
+import type { LocationCategory, LocationResponse, LocationStatus } from '@/types'
+import { CATEGORY_COLOR, CATEGORY_ICON } from '@/lib/mapConstants'
+import LocationSheet from '@/components/LocationSheet'
+import AddLocationSheet from '@/components/AddLocationSheet'
+import MapPanel from '@/components/MapPanel'
+
+const MAP_STYLE = `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${import.meta.env.VITE_MAPTILER_KEY}`
+
+const INITIAL_VIEW = { longitude: -98.5795, latitude: 39.8283, zoom: 4 }
+
+function LocationMarker({ category, name, status, avgRating, description, onClick, onHoverChange }: {
+  category: LocationCategory
+  name: string
+  status: LocationStatus
+  avgRating: number
+  description: string | null
+  onClick: () => void
+  onHoverChange: (hovered: boolean) => void
+}) {
+  const [hovered, setHovered] = useState(false)
+  const color = CATEGORY_COLOR[category]
+  const pending = status === 'pending'
+  const snippet = description ? description.slice(0, 48) + (description.length > 48 ? '…' : '') : null
+
+  return (
+    <div
+      style={{ position: 'relative', display: 'inline-block', opacity: pending ? 0.6 : 1 }}
+      onMouseEnter={() => { setHovered(true); onHoverChange(true) }}
+      onMouseLeave={() => { setHovered(false); onHoverChange(false) }}
+      onClick={e => { e.stopPropagation(); onClick() }}
+    >
+      {hovered && (
+        <div style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          marginBottom: 6,
+          background: 'rgba(14, 40, 34, 0.92)',
+          border: `1px solid ${color}33`,
+          borderRadius: 6,
+          padding: '7px 11px',
+          whiteSpace: 'nowrap',
+          fontFamily: 'Outfit, sans-serif',
+          pointerEvents: 'none',
+        }}>
+          <div style={{ color: '#EEEEEE', fontSize: 12, fontWeight: 600 }}>{name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+            <span style={{ color, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              {category.replace(/_/g, ' ')}
+            </span>
+            <span style={{ color: '#1e3b30', fontSize: 9 }}>·</span>
+            <span style={{ color: '#F5A623', fontSize: 10, letterSpacing: '0.04em' }}>
+              {'★'.repeat(Math.round(avgRating))}{'☆'.repeat(5 - Math.round(avgRating))}
+            </span>
+            <span style={{ color: '#556a62', fontSize: 10 }}>{avgRating.toFixed(1)}</span>
+            {pending && (
+              <span style={{ color: '#F5A623', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                · pending
+              </span>
+            )}
+          </div>
+          {snippet && (
+            <div style={{ color: '#556a62', fontSize: 10.5, marginTop: 4, maxWidth: 200, whiteSpace: 'normal', lineHeight: 1.45 }}>
+              {snippet}
+            </div>
+          )}
+        </div>
+      )}
+      <svg
+        width="32"
+        height="44"
+        viewBox="0 0 32 44"
+        fill="none"
+        style={{ cursor: 'pointer', filter: `drop-shadow(0 3px 10px ${color}${pending ? '33' : '55'})`, display: 'block', color: 'white' }}
+      >
+        <path
+          d="M16 2C8.268 2 2 8.268 2 16C2 26 16 43 16 43C16 43 30 26 30 16C30 8.268 23.732 2 16 2Z"
+          fill={color}
+          fillOpacity="0.12"
+          stroke={color}
+          strokeWidth="1.5"
+          strokeDasharray={pending ? '3 2' : undefined}
+        />
+        <circle cx="16" cy="16" r="10" fill={color} fillOpacity={pending ? 0.5 : 0.88} />
+        {CATEGORY_ICON[category]}
+      </svg>
+    </div>
+  )
+}
+
+function isCluster(f: ClusterFeature<object> | PointFeature<object>): f is ClusterFeature<object> {
+  return (f.properties as { cluster?: boolean }).cluster === true
+}
+
+function ClusterMarker({ count, onClick }: { count: number; onClick: () => void }) {
+  const size = Math.round(Math.min(54, 30 + Math.log2(count + 1) * 7))
+  return (
+    <div
+      onClick={e => { e.stopPropagation(); onClick() }}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'rgba(9, 26, 19, 0.93)',
+        border: '1.5px solid rgba(111, 207, 151, 0.45)',
+        boxShadow: '0 3px 18px rgba(0,0,0,0.6), 0 0 0 4px rgba(111, 207, 151, 0.07)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        fontFamily: 'Outfit, sans-serif',
+        fontSize: Math.round(size * 0.33),
+        fontWeight: 700,
+        color: '#6FCF97',
+        letterSpacing: '-0.02em',
+        userSelect: 'none',
+      }}
+    >
+      {count}
+    </div>
+  )
+}
+
+type HoverCoords = { lat: number; lng: number; x: number; y: number }
+
+export default function MapPage() {
+  const mapRef = useRef<MapRef>(null)
+
+  const [selectedLocation, setSelectedLocation]     = useState<LocationResponse | null>(null)
+  const [placingPin, setPlacingPin]                 = useState(false)
+  const [hoverCoords, setHoverCoords]               = useState<HoverCoords | null>(null)
+  const [pendingCoords, setPendingCoords]           = useState<{ lat: number; lng: number } | null>(null)
+  const [viewState, setViewState]                   = useState(INITIAL_VIEW)
+  const [hoveredPinId, setHoveredPinId]             = useState<string | null>(null)
+  const [panelOpen, setPanelOpen]                   = useState(false)
+  const [selectedCategories, setSelectedCategories] = useState<Set<LocationCategory>>(new Set())
+  const [minRating, setMinRating]                   = useState(0)
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && placingPin) {
+        setPlacingPin(false)
+        setHoverCoords(null)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [placingPin])
+
+  const { data: allLocations = [] } = useQuery({
+    queryKey: ['locations'],
+    queryFn: () => apiGet<LocationResponse[]>('/api/locations'),
+  })
+
+  const { data: mine = [] } = useQuery({
+    queryKey: ['locations', 'mine'],
+    queryFn: () => apiGet<LocationResponse[]>('/api/locations/mine'),
+  })
+
+  const locations = [...allLocations, ...mine.filter(l => l.status === 'pending')]
+
+  const filteredLocations = useMemo(() => locations.filter(loc => {
+    if (selectedCategories.size > 0 && !selectedCategories.has(loc.category)) return false
+    if (minRating > 0 && loc.avgRating < minRating) return false
+    return true
+  }), [locations, selectedCategories, minRating])
+
+  const supercluster = useMemo(() => {
+    const sc = new Supercluster<LocationResponse>({ radius: 60, maxZoom: 15 })
+    sc.load(filteredLocations.map(loc => ({
+      type: 'Feature' as const,
+      properties: { ...loc },
+      geometry: { type: 'Point' as const, coordinates: [loc.lng, loc.lat] },
+    })))
+    return sc
+  }, [filteredLocations])
+
+  const clusters = useMemo(() => {
+    const map = mapRef.current
+    if (!map) return filteredLocations.map(loc => ({
+      type: 'Feature' as const,
+      properties: { ...loc },
+      geometry: { type: 'Point' as const, coordinates: [loc.lng, loc.lat] },
+    }))
+    const bounds = map.getBounds()
+    if (!bounds) return []
+    return supercluster.getClusters(
+      [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()],
+      Math.floor(viewState.zoom),
+    )
+  }, [supercluster, viewState, filteredLocations])
+
+  function handleMapClick(e: { lngLat: { lat: number; lng: number } }) {
+    if (placingPin) {
+      setPendingCoords({ lat: e.lngLat.lat, lng: e.lngLat.lng })
+      setSelectedLocation(null)
+      setPlacingPin(false)
+      setHoverCoords(null)
+    } else {
+      setSelectedLocation(null)
+    }
+  }
+
+  function handleMouseMove(e: { lngLat: { lat: number; lng: number }; point: { x: number; y: number } }) {
+    if (placingPin) {
+      setHoverCoords({ lat: e.lngLat.lat, lng: e.lngLat.lng, x: e.point.x, y: e.point.y })
+    }
+  }
+
+  const latLabel = hoverCoords
+    ? `${Math.abs(hoverCoords.lat).toFixed(5)}° ${hoverCoords.lat >= 0 ? 'N' : 'S'}`
+    : ''
+  const lngLabel = hoverCoords
+    ? `${Math.abs(hoverCoords.lng).toFixed(5)}° ${hoverCoords.lng >= 0 ? 'E' : 'W'}`
+    : ''
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+      <Map
+        ref={mapRef}
+        initialViewState={INITIAL_VIEW}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle={MAP_STYLE}
+        cursor={placingPin ? 'crosshair' : 'grab'}
+        onClick={handleMapClick}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoverCoords(null)}
+        onMove={e => setViewState(e.viewState)}
+      >
+        <NavigationControl position="bottom-right" />
+
+        {clusters.map((feature, i) => {
+          const [lng, lat] = feature.geometry.coordinates
+          if (isCluster(feature)) {
+            const { point_count: count, cluster_id: clusterId } = feature.properties as { point_count: number; cluster_id: number }
+            return (
+              <Marker key={`cluster-${i}`} longitude={lng} latitude={lat} anchor="center">
+                <ClusterMarker
+                  count={count}
+                  onClick={() => {
+                    const expansionZoom = Math.min(supercluster.getClusterExpansionZoom(clusterId), 20)
+                    mapRef.current?.easeTo({ center: [lng, lat], zoom: expansionZoom, duration: 450 })
+                  }}
+                />
+              </Marker>
+            )
+          }
+          const loc = feature.properties as LocationResponse
+          return (
+            <Marker
+              key={loc.id}
+              longitude={lng}
+              latitude={lat}
+              anchor="bottom"
+              style={{ zIndex: hoveredPinId === loc.id ? 10 : 1 }}
+            >
+              <LocationMarker
+                category={loc.category}
+                name={loc.name}
+                status={loc.status}
+                avgRating={loc.avgRating}
+                description={loc.description}
+                onClick={() => !placingPin && setSelectedLocation(loc)}
+                onHoverChange={(h) => setHoveredPinId(h ? loc.id : null)}
+              />
+            </Marker>
+          )
+        })}
+      </Map>
+
+      <MapPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        selectedCategories={selectedCategories}
+        minRating={minRating}
+        onCategoryToggle={cat => setSelectedCategories(prev => {
+          const next = new Set(prev)
+          next.has(cat) ? next.delete(cat) : next.add(cat)
+          return next
+        })}
+        onMinRatingChange={setMinRating}
+        onClear={() => { setSelectedCategories(new Set()); setMinRating(0) }}
+        onFlyTo={(lng, lat, zoom) => mapRef.current?.flyTo({ center: [lng, lat], zoom, duration: 600 })}
+      />
+
+      {/* Filter toggle button */}
+      {!placingPin && (
+        <button
+          onClick={() => setPanelOpen(p => !p)}
+          title="Filters"
+          style={{
+            position: 'fixed',
+            bottom: '5.5rem',
+            left: '1.5rem',
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            background: panelOpen ? 'rgba(111, 207, 151, 0.12)' : 'rgba(6, 15, 11, 0.9)',
+            border: `1px solid ${panelOpen ? 'rgba(111, 207, 151, 0.5)' : 'rgba(111, 207, 151, 0.22)'}`,
+            color: '#6FCF97',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 30,
+            transition: 'background 0.2s, border-color 0.2s',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          }}
+        >
+          {/* Active filter dot */}
+          {(selectedCategories.size > 0 || minRating > 0) && (
+            <div style={{
+              position: 'absolute',
+              top: 7,
+              right: 7,
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: '#6FCF97',
+              border: '1.5px solid rgba(6,15,11,0.9)',
+            }} />
+          )}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="6" y1="12" x2="18" y2="12" />
+            <line x1="9" y1="18" x2="15" y2="18" />
+          </svg>
+        </button>
+      )}
+
+      {/* Placement mode hint bar */}
+      {placingPin && (
+        <div style={{
+          position: 'fixed',
+          top: '1.1rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(6, 15, 11, 0.88)',
+          border: '1px solid rgba(111, 207, 151, 0.18)',
+          borderRadius: '6px',
+          padding: '7px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          pointerEvents: 'none',
+          zIndex: 30,
+          backdropFilter: 'blur(6px)',
+        }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <circle cx="5" cy="5" r="4" stroke="#6FCF97" strokeWidth="1" />
+            <line x1="5" y1="1" x2="5" y2="3" stroke="#6FCF97" strokeWidth="1" strokeLinecap="round" />
+            <line x1="5" y1="7" x2="5" y2="9" stroke="#6FCF97" strokeWidth="1" strokeLinecap="round" />
+            <line x1="1" y1="5" x2="3" y2="5" stroke="#6FCF97" strokeWidth="1" strokeLinecap="round" />
+            <line x1="7" y1="5" x2="9" y2="5" stroke="#6FCF97" strokeWidth="1" strokeLinecap="round" />
+          </svg>
+          <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 11, color: '#9aada5', letterSpacing: '0.08em' }}>
+            Click to place your pin
+          </span>
+          <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 10, color: '#2d5248', letterSpacing: '0.06em' }}>
+            ESC to cancel
+          </span>
+        </div>
+      )}
+
+      {/* Coordinate tooltip following cursor */}
+      {placingPin && hoverCoords && (
+        <div style={{
+          position: 'fixed',
+          left: hoverCoords.x + 18,
+          top: hoverCoords.y - 38,
+          background: 'rgba(6, 15, 11, 0.92)',
+          border: '1px solid rgba(111, 207, 151, 0.14)',
+          borderRadius: '5px',
+          padding: '5px 10px',
+          pointerEvents: 'none',
+          zIndex: 30,
+          whiteSpace: 'nowrap',
+        }}>
+          <span style={{
+            fontFamily: 'Outfit, monospace',
+            fontSize: 11,
+            color: '#6FCF97',
+            letterSpacing: '0.1em',
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {latLabel}
+          </span>
+          <span style={{ fontFamily: 'Outfit, monospace', fontSize: 11, color: '#2d5248', margin: '0 6px' }}>·</span>
+          <span style={{
+            fontFamily: 'Outfit, monospace',
+            fontSize: 11,
+            color: '#6FCF97',
+            letterSpacing: '0.1em',
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {lngLabel}
+          </span>
+        </div>
+      )}
+
+      {/* Add pin button */}
+      <button
+        onClick={() => { setPlacingPin(p => !p); setHoverCoords(null) }}
+        title={placingPin ? 'Cancel placement' : 'Add a spot'}
+        style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          left: '1.5rem',
+          width: 44,
+          height: 44,
+          borderRadius: '50%',
+          background: placingPin ? 'rgba(111, 207, 151, 0.12)' : 'rgba(6, 15, 11, 0.9)',
+          border: `1px solid ${placingPin ? 'rgba(111, 207, 151, 0.5)' : 'rgba(111, 207, 151, 0.22)'}`,
+          color: '#6FCF97',
+          fontSize: placingPin ? 20 : 24,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 30,
+          transition: 'background 0.2s, border-color 0.2s',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          fontFamily: 'Outfit, sans-serif',
+          lineHeight: 1,
+        }}
+      >
+        {placingPin ? '×' : '+'}
+      </button>
+
+      <LocationSheet
+        location={selectedLocation}
+        onClose={() => setSelectedLocation(null)}
+      />
+
+      <AddLocationSheet
+        coords={pendingCoords}
+        onClose={() => setPendingCoords(null)}
+      />
+    </div>
+  )
+}

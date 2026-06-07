@@ -1,0 +1,384 @@
+/* ── Sheet shell ─────────────────────────────────── */
+.location-sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background: #060f0b;
+  border-left: 1px solid rgba(111, 207, 151, 0.07);
+  box-shadow: -12px 0 60px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.42s cubic-bezier(0.32, 0, 0.15, 1);
+  z-index: 20;
+  font-family: 'Outfit', sans-serif;
+}
+
+.location-sheet--open {
+  transform: translateX(0);
+}
+
+/* ── Category accent bar ─────────────────────────── */
+.ls-accent-bar {
+  height: 3px;
+  width: 100%;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+}
+
+/* ── Header ──────────────────────────────────────── */
+.ls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid rgba(111, 207, 151, 0.06);
+  flex-shrink: 0;
+}
+
+.ls-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid rgba(111, 207, 151, 0.1);
+  background: rgba(111, 207, 151, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.ls-close:hover {
+  background: rgba(111, 207, 151, 0.09);
+  border-color: rgba(111, 207, 151, 0.22);
+}
+
+.ls-header-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.ls-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1px solid rgba(111, 207, 151, 0.1);
+  background: transparent;
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.ls-action-btn.save {
+  color: #6FCF97;
+}
+.ls-action-btn.save:hover {
+  background: rgba(111, 207, 151, 0.08);
+  border-color: rgba(111, 207, 151, 0.28);
+}
+
+.ls-action-btn.report {
+  color: #556a62;
+  border-color: rgba(85, 106, 98, 0.2);
+}
+.ls-action-btn.report:hover {
+  color: #F06B6B;
+  background: rgba(240, 107, 107, 0.06);
+  border-color: rgba(240, 107, 107, 0.2);
+}
+
+/* ── Scrollable body ─────────────────────────────── */
+.ls-body {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(111, 207, 151, 0.12) transparent;
+}
+
+.ls-body::-webkit-scrollbar { width: 3px; }
+.ls-body::-webkit-scrollbar-track { background: transparent; }
+.ls-body::-webkit-scrollbar-thumb {
+  background: rgba(111, 207, 151, 0.12);
+  border-radius: 2px;
+}
+
+/* ── Identity ────────────────────────────────────── */
+.ls-identity {
+  padding: 1.4rem 1.25rem 1.1rem;
+}
+
+.ls-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+}
+
+.ls-category-badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+
+.ls-status-badge {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 3px;
+}
+
+.ls-status-badge.verified { color: #6FCF97; background: rgba(111, 207, 151, 0.08); }
+.ls-status-badge.pending  { color: #F5A623; background: rgba(245, 166, 35, 0.08); }
+.ls-status-badge.archived { color: #556a62; background: rgba(85, 106, 98, 0.08); }
+
+/* ── Pending tooltip ─────────────────────────────── */
+.ls-pending-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ls-pending-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 210px;
+  background: rgba(11, 32, 24, 0.97);
+  border: 1px solid rgba(245, 166, 35, 0.22);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #9aada5;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s;
+  z-index: 10;
+  white-space: normal;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.ls-pending-tooltip-wrap:hover .ls-pending-tooltip {
+  opacity: 1;
+}
+
+.ls-private-badge {
+  font-size: 9px;
+  color: #556a62;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ls-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 27px;
+  font-weight: 800;
+  color: #EEEEEE;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  margin: 0 0 0.8rem;
+}
+
+.ls-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0.55rem;
+}
+
+.ls-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ls-rating-num {
+  font-size: 11px;
+  color: #556a62;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.ls-coords {
+  font-size: 10px;
+  color: #253f36;
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  font-family: 'Outfit', monospace;
+}
+
+/* ── Divider ─────────────────────────────────────── */
+.ls-divider {
+  height: 1px;
+  background: rgba(111, 207, 151, 0.06);
+  margin: 0 1.25rem;
+}
+
+/* ── Description section ─────────────────────────── */
+.ls-description-section {
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+
+.ls-description {
+  font-size: 13.5px;
+  color: #9aada5;
+  line-height: 1.78;
+  margin: 0;
+}
+
+/* ── Tags ────────────────────────────────────────── */
+.ls-tags {
+  padding: 0.75rem 1.25rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ls-tag {
+  font-size: 10px;
+  color: #2d5248;
+  background: rgba(45, 82, 72, 0.18);
+  border: 1px solid rgba(45, 82, 72, 0.35);
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+}
+
+/* ── Reviews section ─────────────────────────────── */
+.ls-reviews-section {
+  padding: 1.25rem;
+}
+
+.ls-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.ls-section-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #2d5248;
+}
+
+.ls-section-count {
+  font-size: 9px;
+  color: #6FCF97;
+  background: rgba(111, 207, 151, 0.08);
+  border: 1px solid rgba(111, 207, 151, 0.12);
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ls-empty {
+  font-size: 12.5px;
+  color: #2d5248;
+  font-style: italic;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.ls-reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+/* ── Review card ─────────────────────────────────── */
+.ls-review-card {
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(111, 207, 151, 0.06);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+}
+
+.ls-review-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.ls-review-user {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6FCF97;
+  letter-spacing: 0.04em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ls-review-date {
+  font-size: 9.5px;
+  color: #253f36;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ls-review-stars {
+  display: flex;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.ls-review-text {
+  font-size: 12.5px;
+  color: #7a9b90;
+  line-height: 1.68;
+  margin: 0 0 0.65rem;
+}
+
+.ls-review-footer {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.ls-vote-btn {
+  font-size: 10px;
+  color: #2d5248;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: 0.06em;
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ls-vote-btn:hover { color: #6FCF97; }
+
+/* ── Bottom padding ──────────────────────────────── */
+.ls-bottom-pad {
+  height: 2rem;
+  flex-shrink: 0;
+}
