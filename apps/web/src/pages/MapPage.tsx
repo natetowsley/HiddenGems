@@ -61,13 +61,14 @@ const CATEGORY_ICON: Record<LocationCategory, React.ReactNode> = {
   ),
 }
 
-function LocationMarker({ category, name, status, avgRating, description, onClick }: {
+function LocationMarker({ category, name, status, avgRating, description, onClick, onHoverChange }: {
   category: LocationCategory
   name: string
   status: LocationStatus
   avgRating: number
   description: string | null
   onClick: () => void
+  onHoverChange: (hovered: boolean) => void
 }) {
   const [hovered, setHovered] = useState(false)
   const color = CATEGORY_COLOR[category]
@@ -77,8 +78,8 @@ function LocationMarker({ category, name, status, avgRating, description, onClic
   return (
     <div
       style={{ position: 'relative', display: 'inline-block', opacity: pending ? 0.6 : 1 }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => { setHovered(true); onHoverChange(true) }}
+      onMouseLeave={() => { setHovered(false); onHoverChange(false) }}
       onClick={e => { e.stopPropagation(); onClick() }}
     >
       {hovered && (
@@ -184,6 +185,7 @@ export default function MapPage() {
   const [hoverCoords, setHoverCoords]           = useState<HoverCoords | null>(null)
   const [pendingCoords, setPendingCoords]       = useState<{ lat: number; lng: number } | null>(null)
   const [viewState, setViewState]               = useState(INITIAL_VIEW)
+  const [hoveredPinId, setHoveredPinId]         = useState<string | null>(null)
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -290,7 +292,13 @@ export default function MapPage() {
           }
           const loc = feature.properties as LocationResponse
           return (
-            <Marker key={loc.id} longitude={lng} latitude={lat} anchor="bottom">
+            <Marker
+              key={loc.id}
+              longitude={lng}
+              latitude={lat}
+              anchor="bottom"
+              style={{ zIndex: hoveredPinId === loc.id ? 10 : 1 }}
+            >
               <LocationMarker
                 category={loc.category}
                 name={loc.name}
@@ -298,6 +306,7 @@ export default function MapPage() {
                 avgRating={loc.avgRating}
                 description={loc.description}
                 onClick={() => !placingPin && setSelectedLocation(loc)}
+                onHoverChange={(h) => setHoveredPinId(h ? loc.id : null)}
               />
             </Marker>
           )
