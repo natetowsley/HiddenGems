@@ -90,10 +90,10 @@ export default function MapPanel({
   return (
     <div style={{
       position: 'fixed',
-      top: 0,
+      top: 56,
       left: 0,
       width: 280,
-      height: '100vh',
+      height: 'calc(100vh - 56px)',
       background: 'rgba(5, 13, 10, 0.97)',
       borderRight: '1px solid rgba(111, 207, 151, 0.1)',
       boxShadow: open ? '8px 0 48px rgba(0,0,0,0.65)' : 'none',
