@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPut } from '@/api/client'
-import type { UserResponse } from '@/types'
+import { apiGet, apiPut, apiPost } from '@/api/client'
+import type { UserResponse, CollectionResponse } from '@/types'
 
 const KEYFRAMES = `
 @keyframes pg-fadeUp {
@@ -20,6 +20,7 @@ const KEYFRAMES = `
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+.pg-col-scroll::-webkit-scrollbar { display: none; }
 `
 
 function formatDate(iso: string) {
@@ -53,7 +54,8 @@ export default function ProfilePage() {
         backgroundRepeat: 'no-repeat, repeat',
         fontFamily: 'Outfit, sans-serif',
         display: 'flex',
-        justifyContent: 'center',
+        flexDirection: 'column',
+        alignItems: 'center',
         padding: '68px 20px 80px',
       }}>
         {isLoading ? (
@@ -63,6 +65,7 @@ export default function ProfilePage() {
         ) : profile ? (
           <ProfileCard profile={profile} />
         ) : null}
+        {profile && <CollectionsSection />}
       </div>
     </>
   )
@@ -368,6 +371,357 @@ function ProfileCard({ profile }: { profile: UserResponse }) {
         )}
       </div>
     </div>
+  )
+}
+
+// --- Collections section ---
+
+function accentColor(title: string): string {
+  const palette = ['#7EB8F7', '#F5A623', '#6FCF97', '#B88EF0', '#C4956A', '#F06B6B']
+  let h = 0
+  for (const c of title) h = (h * 31 + c.charCodeAt(0)) & 0xffff
+  return palette[h % palette.length]
+}
+
+function CollectionsSection() {
+  const qc = useQueryClient()
+  const [creating, setCreating] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newPrivate, setNewPrivate] = useState(false)
+  const [newHovered, setNewHovered] = useState(false)
+
+  const { data: collections = [] } = useQuery({
+    queryKey: ['collections'],
+    queryFn: () => apiGet<CollectionResponse[]>('/api/collections'),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      apiPost<CollectionResponse>('/api/collections', {
+        title: newTitle.trim(),
+        isPrivate: newPrivate,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collections'] })
+      setCreating(false)
+      setNewTitle('')
+      setNewPrivate(false)
+    },
+  })
+
+  return (
+    <div style={{
+      width: '100%',
+      maxWidth: 560,
+      marginTop: 22,
+      animation: 'pg-fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.38s both',
+    }}>
+      {/* Section header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: creating ? 12 : 14,
+        paddingLeft: 2,
+      }}>
+        <span style={{
+          color: '#3a5e4a',
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: '0.24em',
+          textTransform: 'uppercase',
+        }}>Collections</span>
+        <span style={{
+          fontSize: 9,
+          color: '#6FCF97',
+          background: 'rgba(111,207,151,0.08)',
+          border: '1px solid rgba(111,207,151,0.12)',
+          padding: '1px 7px',
+          borderRadius: 10,
+          fontVariantNumeric: 'tabular-nums',
+        }}>{collections.length}</span>
+      </div>
+
+      {/* Inline create form */}
+      {creating && (
+        <div style={{
+          marginBottom: 14,
+          padding: '12px 14px',
+          border: '1px solid rgba(111,207,151,0.12)',
+          borderRadius: 10,
+          background: 'rgba(9,23,17,0.7)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          animation: 'pg-fadeUp 0.18s ease both',
+        }}>
+          <input
+            value={newTitle}
+            onChange={e => setNewTitle(e.target.value)}
+            placeholder="Collection name…"
+            autoFocus
+            maxLength={255}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && newTitle.trim()) createMutation.mutate()
+              if (e.key === 'Escape') { setCreating(false); setNewTitle('') }
+            }}
+            style={{
+              background: 'rgba(255,255,255,0.022)',
+              border: '1px solid rgba(111,207,151,0.1)',
+              borderRadius: 6,
+              padding: '8px 11px',
+              color: '#EEEEEE',
+              fontSize: 13,
+              fontFamily: 'Outfit, sans-serif',
+              outline: 'none',
+              width: '100%',
+              boxSizing: 'border-box' as const,
+              transition: 'border-color 0.15s',
+            }}
+            onFocus={e => { e.currentTarget.style.borderColor = 'rgba(111,207,151,0.28)' }}
+            onBlur={e => { e.currentTarget.style.borderColor = 'rgba(111,207,151,0.1)' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <PrivacyToggle value={newPrivate} onChange={setNewPrivate} />
+            <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+              <button
+                onClick={() => { setCreating(false); setNewTitle('') }}
+                style={{
+                  padding: '5px 12px',
+                  border: '1px solid rgba(111,207,151,0.07)',
+                  borderRadius: 6,
+                  background: 'transparent',
+                  fontFamily: 'Outfit, sans-serif',
+                  fontSize: 11,
+                  color: '#556a62',
+                  cursor: 'pointer',
+                  letterSpacing: '0.04em',
+                }}
+              >Cancel</button>
+              <button
+                onClick={() => createMutation.mutate()}
+                disabled={!newTitle.trim() || createMutation.isPending}
+                style={{
+                  padding: '5px 14px',
+                  border: '1px solid rgba(111,207,151,0.24)',
+                  borderRadius: 6,
+                  background: 'rgba(111,207,151,0.1)',
+                  fontFamily: 'Outfit, sans-serif',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: !newTitle.trim() || createMutation.isPending ? '#3a5e4a' : '#6FCF97',
+                  cursor: !newTitle.trim() || createMutation.isPending ? 'default' : 'pointer',
+                  letterSpacing: '0.04em',
+                  opacity: !newTitle.trim() || createMutation.isPending ? 0.5 : 1,
+                  transition: 'opacity 0.15s',
+                }}
+              >{createMutation.isPending ? 'Creating…' : 'Create'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Horizontal tiles row */}
+      <div
+        className="pg-col-scroll"
+        style={{
+          display: 'flex',
+          gap: 12,
+          overflowX: 'auto',
+          paddingBottom: 6,
+          scrollbarWidth: 'none',
+        }}
+      >
+        {/* New collection tile */}
+        <button
+          onClick={() => setCreating(true)}
+          onMouseEnter={() => setNewHovered(true)}
+          onMouseLeave={() => setNewHovered(false)}
+          style={{
+            width: 128,
+            height: 140,
+            flexShrink: 0,
+            borderRadius: 11,
+            border: `1px dashed ${newHovered || creating ? 'rgba(111,207,151,0.38)' : 'rgba(111,207,151,0.16)'}`,
+            background: newHovered || creating ? 'rgba(111,207,151,0.04)' : 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            transition: 'border-color 0.15s, background 0.15s',
+            scrollSnapAlign: 'start',
+          }}
+        >
+          <div style={{
+            width: 34,
+            height: 34,
+            borderRadius: '50%',
+            background: 'rgba(111,207,151,0.09)',
+            border: '1px solid rgba(111,207,151,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#6FCF97',
+            transition: 'background 0.15s',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M6.5 1.5v10M1.5 6.5h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </div>
+          <span style={{
+            fontFamily: 'Outfit, sans-serif',
+            fontSize: 11,
+            fontWeight: 500,
+            color: '#3a5e4a',
+            letterSpacing: '0.06em',
+          }}>New</span>
+        </button>
+
+        {collections.map(col => (
+          <CollectionTile key={col.id} collection={col} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PrivacyToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      onClick={() => onChange(!value)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '4px 10px',
+        border: `1px solid ${value ? 'rgba(111,207,151,0.26)' : hovered ? 'rgba(111,207,151,0.16)' : 'rgba(111,207,151,0.1)'}`,
+        borderRadius: 5,
+        background: value ? 'rgba(111,207,151,0.06)' : 'transparent',
+        color: value ? '#6FCF97' : hovered ? '#9aada5' : '#556a62',
+        fontSize: 10.5,
+        fontFamily: 'Outfit, sans-serif',
+        cursor: 'pointer',
+        letterSpacing: '0.04em',
+        transition: 'all 0.15s',
+      }}
+    >
+      {value ? (
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <rect x="1.5" y="4.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.1" />
+          <path d="M3 4.5v-1a2 2 0 014 0v1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <rect x="1.5" y="4.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.1" />
+          <path d="M3 4.5v-1a2 2 0 014 0v1M7 4.5V3.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+        </svg>
+      )}
+      {value ? 'Private' : 'Public'}
+    </button>
+  )
+}
+
+function CollectionTile({ collection }: { collection: CollectionResponse }) {
+  const [hovered, setHovered] = useState(false)
+  const color = accentColor(collection.title)
+  const count = collection.locationIds.length
+
+  return (
+    <button
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => console.log('open collection', collection.id)}
+      style={{
+        width: 128,
+        height: 140,
+        flexShrink: 0,
+        borderRadius: 11,
+        border: `1px solid ${hovered ? `${color}35` : 'rgba(111,207,151,0.07)'}`,
+        background: hovered ? `${color}0c` : 'rgba(255,255,255,0.018)',
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        transition: 'border-color 0.15s, background 0.15s',
+        scrollSnapAlign: 'start',
+        textAlign: 'left',
+        padding: 0,
+      }}
+    >
+      {/* Color section */}
+      <div style={{
+        flex: 1,
+        background: `${color}14`,
+        borderBottom: `1px solid ${color}22`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 7px)',
+          pointerEvents: 'none',
+        }} />
+        <span style={{
+          fontFamily: 'Syne, sans-serif',
+          fontSize: 28,
+          fontWeight: 800,
+          color,
+          lineHeight: 1,
+          position: 'relative',
+          zIndex: 1,
+        }}>
+          {collection.title[0].toUpperCase()}
+        </span>
+        {collection.isPrivate && (
+          <div style={{
+            position: 'absolute',
+            top: 6,
+            right: 7,
+            color: `${color}88`,
+          }}>
+            <svg width="9" height="9" viewBox="0 0 8 8" fill="none">
+              <rect x="1" y="3.5" width="6" height="4.5" rx="0.8" stroke="currentColor" strokeWidth="1" />
+              <path d="M2.2 3.5V2.4a1.8 1.8 0 013.6 0v1.1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+            </svg>
+          </div>
+        )}
+      </div>
+
+      {/* Title / count */}
+      <div style={{ padding: '7px 10px 8px', flexShrink: 0 }}>
+        <div style={{
+          fontFamily: 'Outfit, sans-serif',
+          fontSize: 12,
+          fontWeight: 500,
+          color: '#EEEEEE',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          letterSpacing: '0.01em',
+          lineHeight: 1.2,
+          marginBottom: 3,
+        }}>
+          {collection.title}
+        </div>
+        <div style={{
+          fontFamily: 'Outfit, sans-serif',
+          fontSize: 10,
+          color: '#2d5248',
+          letterSpacing: '0.04em',
+        }}>
+          {count} {count === 1 ? 'place' : 'places'}
+        </div>
+      </div>
+    </button>
   )
 }
 
