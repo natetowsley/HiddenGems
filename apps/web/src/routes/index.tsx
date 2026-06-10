@@ -5,6 +5,7 @@ import LoginPage from '@/pages/LoginPage'
 import SignupPage from '@/pages/SignupPage'
 import MapPage from '@/pages/MapPage'
 import ProfilePage from '@/pages/ProfilePage'
+import CollectionPage from '@/pages/CollectionPage'
 import SettingsPage from '@/pages/SettingsPage'
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -33,6 +34,7 @@ export function AppRouter() {
         <Route element={<RequireAuth><AuthLayout /></RequireAuth>}>
           <Route path="/" element={<MapPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/collections/:id" element={<CollectionPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
 

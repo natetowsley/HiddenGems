@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiPost } from '@/api/client'
 import type { UserResponse, CollectionResponse } from '@/types'
@@ -628,6 +629,7 @@ function PrivacyToggle({ value, onChange }: { value: boolean; onChange: (v: bool
 
 function CollectionTile({ collection }: { collection: CollectionResponse }) {
   const [hovered, setHovered] = useState(false)
+  const navigate = useNavigate()
   const color = accentColor(collection.title)
   const count = collection.locationIds.length
 
@@ -635,7 +637,7 @@ function CollectionTile({ collection }: { collection: CollectionResponse }) {
     <button
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={() => console.log('open collection', collection.id)}
+      onClick={() => navigate(`/collections/${collection.id}`)}
       style={{
         width: 128,
         height: 140,
