@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '@/api/client'
 import type { LocationCategory, LocationResponse, PublicUserResponse, ReviewResponse } from '@/types'
+import AddToCollectionModal from './AddToCollectionModal'
 import './LocationSheet.css'
 
 const CATEGORY_COLOR: Record<LocationCategory, string> = {
@@ -92,9 +94,11 @@ interface Props {
 export default function LocationSheet({ location, onClose }: Props) {
   // Keep last non-null location displayed during slide-out animation
   const [displayed, setDisplayed] = useState<LocationResponse | null>(location)
+  const [collectionOpen, setCollectionOpen] = useState(false)
 
   useEffect(() => {
     if (location) setDisplayed(location)
+    else setCollectionOpen(false)
   }, [location])
 
   const isOpen = location !== null
@@ -121,6 +125,7 @@ export default function LocationSheet({ location, onClose }: Props) {
     : ''
 
   return (
+    <>
     <aside className={`location-sheet${isOpen ? ' location-sheet--open' : ''}`}>
 
       <div className="ls-accent-bar" style={{ background: color }} />
@@ -133,9 +138,10 @@ export default function LocationSheet({ location, onClose }: Props) {
         </button>
 
         <div className="ls-header-actions">
-          <button className="ls-action-btn save" onClick={() => console.log('save', loc?.id)}>
+          <button className="ls-action-btn save" onClick={() => setCollectionOpen(true)}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 1.5h8v9L6 8.5 2 10.5V1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+              <path d="M1.5 5H5l1-1.5h5V11H1.5V5Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+              <path d="M6 7.5v2M5 8.5h2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
             </svg>
             Save
           </button>
@@ -236,5 +242,14 @@ export default function LocationSheet({ location, onClose }: Props) {
         </div>
       )}
     </aside>
+    {loc && createPortal(
+      <AddToCollectionModal
+        locationId={loc.id}
+        isOpen={collectionOpen}
+        onClose={() => setCollectionOpen(false)}
+      />,
+      document.body
+    )}
+    </>
   )
 }
