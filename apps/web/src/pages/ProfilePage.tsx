@@ -68,9 +68,8 @@ function ProfileCard({ profile }: { profile: UserResponse }) {
   const isAdmin = profile.role === 'admin'
 
   const rows = [
-    { label: 'Email',  value: profile.email,                         mono: false, muted: false },
-    { label: 'Joined', value: formatDate(profile.createdAt),          mono: false, muted: false },
-    { label: 'ID',     value: profile.id.split('-')[0].toUpperCase(), mono: true,  muted: true  },
+    { label: 'Email',  value: profile.email,            mono: false, muted: false },
+    { label: 'Joined', value: formatDate(profile.createdAt), mono: false, muted: false },
   ]
 
   return (
