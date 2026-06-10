@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useQueries } from '@tanstack/react-query'
-import { apiGet } from '@/api/client'
-import type { CollectionResponse, LocationCategory, LocationResponse } from '@/types'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiGet, apiPut } from '@/api/client'
+import { useAuth } from '@/contexts/AuthContext'
+import type { CollectionResponse, LocationCategory, LocationResponse, PublicUserResponse } from '@/types'
 
 const CATEGORY_COLOR: Record<LocationCategory, string> = {
   study_spot: '#7EB8F7',
@@ -48,6 +49,7 @@ function Stars({ rating }: { rating: number }) {
 export default function CollectionPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const { data: collection, isLoading: collLoading, isError, error } = useQuery({
     queryKey: ['collections', id],
@@ -68,7 +70,14 @@ export default function CollectionPage() {
   const locLoading = locationQueries.some(q => q.isLoading)
   const isLoading = collLoading || (!!collection && collection.locationIds.length > 0 && locLoading)
 
+  const { data: owner } = useQuery({
+    queryKey: ['user', collection?.userId],
+    queryFn: () => apiGet<PublicUserResponse>(`/api/users/${collection!.userId}`),
+    enabled: !!collection,
+  })
+
   const color = collection ? accentColor(collection.title) : '#6FCF97'
+  const isOwner = !!user && !!collection && collection.userId === user.id
   const is403 = isError && error instanceof Error && error.message.startsWith('403')
   const is404 = isError && !is403
 
@@ -130,7 +139,7 @@ export default function CollectionPage() {
             {isLoading || !collection ? (
               <HeaderSkeleton />
             ) : (
-              <CollectionHeader collection={collection} color={color} />
+              <CollectionHeader collection={collection} color={color} isOwner={isOwner} owner={owner} />
             )}
 
             <div style={{
@@ -162,7 +171,52 @@ export default function CollectionPage() {
   )
 }
 
-function CollectionHeader({ collection, color }: { collection: CollectionResponse; color: string }) {
+function CollectionHeader({
+  collection,
+  color,
+  isOwner,
+  owner,
+}: {
+  collection: CollectionResponse
+  color: string
+  isOwner: boolean
+  owner?: PublicUserResponse
+}) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({ title: collection.title, isPrivate: collection.isPrivate })
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiPut<CollectionResponse>(`/api/collections/${collection.id}`, {
+        title: draft.title.trim(),
+        isPrivate: draft.isPrivate,
+      }),
+    onSuccess: updated => {
+      qc.setQueryData(['collections', collection.id], updated)
+      // also update the collections list cache so the profile tile reflects changes
+      qc.invalidateQueries({ queryKey: ['collections'] })
+      setEditing(false)
+    },
+  })
+
+  function startEdit() {
+    setDraft({ title: collection.title, isPrivate: collection.isPrivate })
+    mutation.reset()
+    setEditing(true)
+  }
+
+  function cancel() {
+    setEditing(false)
+    mutation.reset()
+  }
+
+  const displayTitle = editing ? draft.title : collection.title
+  const displayPrivate = editing ? draft.isPrivate : collection.isPrivate
+  const ghostLetter = (displayTitle[0] ?? collection.title[0]).toUpperCase()
+  const liveColor = editing ? accentColor(draft.title || collection.title) : color
+  const canSave = draft.title.trim().length > 0 && !mutation.isPending
+
   return (
     <div style={{ position: 'relative' }}>
       {/* Ghost initial watermark */}
@@ -173,55 +227,213 @@ function CollectionHeader({ collection, color }: { collection: CollectionRespons
         fontFamily: 'Syne, sans-serif',
         fontSize: 160,
         fontWeight: 800,
-        color,
+        color: liveColor,
         opacity: 0.05,
         lineHeight: 1,
         userSelect: 'none',
         pointerEvents: 'none',
         letterSpacing: '-0.05em',
+        transition: 'color 0.2s',
       }}>
-        {collection.title[0].toUpperCase()}
+        {ghostLetter}
       </div>
 
       <div style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 10,
-        }}>
-          <span style={{
-            fontSize: 9,
-            fontWeight: 600,
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            color: collection.isPrivate ? '#556a62' : '#6FCF97',
-            background: collection.isPrivate ? 'rgba(85,106,98,0.08)' : 'rgba(111,207,151,0.08)',
-            border: `1px solid ${collection.isPrivate ? 'rgba(85,106,98,0.2)' : 'rgba(111,207,151,0.2)'}`,
-            padding: '2px 9px',
-            borderRadius: 4,
-          }}>
-            {collection.isPrivate ? 'Private' : 'Public'}
-          </span>
+
+        {/* Edit button — owner only, view mode only */}
+        {isOwner && !editing && (
+          <button
+            onClick={startEdit}
+            title="Edit collection"
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 6,
+              borderRadius: 6,
+              color: '#3a5e4a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#6FCF97' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#3a5e4a' }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+        )}
+
+        {/* Privacy badge / toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          {editing ? (
+            <button
+              onClick={() => setDraft(d => ({ ...d, isPrivate: !d.isPrivate }))}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: draft.isPrivate ? '#556a62' : '#6FCF97',
+                background: draft.isPrivate ? 'rgba(85,106,98,0.1)' : 'rgba(111,207,151,0.1)',
+                border: `1px solid ${draft.isPrivate ? 'rgba(85,106,98,0.28)' : 'rgba(111,207,151,0.28)'}`,
+                padding: '3px 10px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontFamily: 'Outfit, sans-serif',
+                transition: 'color 0.15s, background 0.15s, border-color 0.15s',
+              }}
+            >
+              {draft.isPrivate ? (
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <rect x="1" y="3.5" width="6" height="4.5" rx="0.8" stroke="currentColor" strokeWidth="1"/>
+                  <path d="M2.2 3.5V2.4a1.8 1.8 0 013.6 0v1.1" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+              ) : (
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <rect x="1" y="3.5" width="6" height="4.5" rx="0.8" stroke="currentColor" strokeWidth="1"/>
+                  <path d="M2.2 3.5V2.4a1.8 1.8 0 013.6 0v1.1M6 3.5V3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+              )}
+              {draft.isPrivate ? 'Private' : 'Public'}
+            </button>
+          ) : (
+            <span style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: displayPrivate ? '#556a62' : '#6FCF97',
+              background: displayPrivate ? 'rgba(85,106,98,0.08)' : 'rgba(111,207,151,0.08)',
+              border: `1px solid ${displayPrivate ? 'rgba(85,106,98,0.2)' : 'rgba(111,207,151,0.2)'}`,
+              padding: '2px 9px',
+              borderRadius: 4,
+            }}>
+              {displayPrivate ? 'Private' : 'Public'}
+            </span>
+          )}
         </div>
 
-        <h1 style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: 38,
-          fontWeight: 800,
-          color: '#EEEEEE',
-          letterSpacing: '-0.03em',
-          lineHeight: 1.05,
-          margin: '0 0 14px',
-        }}>
-          {collection.title}
-        </h1>
+        {/* Title */}
+        {editing ? (
+          <input
+            value={draft.title}
+            onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
+            autoFocus
+            maxLength={255}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && canSave) mutation.mutate()
+              if (e.key === 'Escape') cancel()
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '2px solid rgba(111,207,151,0.35)',
+              color: '#EEEEEE',
+              fontFamily: 'Syne, sans-serif',
+              fontSize: 38,
+              fontWeight: 800,
+              letterSpacing: '-0.03em',
+              lineHeight: 1.05,
+              outline: 'none',
+              width: '100%',
+              marginBottom: 14,
+              padding: '0 0 6px',
+              transition: 'border-color 0.15s',
+            }}
+            onFocus={e => { e.currentTarget.style.borderBottomColor = 'rgba(111,207,151,0.65)' }}
+            onBlur={e => { e.currentTarget.style.borderBottomColor = 'rgba(111,207,151,0.35)' }}
+          />
+        ) : (
+          <h1 style={{
+            fontFamily: 'Syne, sans-serif',
+            fontSize: 38,
+            fontWeight: 800,
+            color: '#EEEEEE',
+            letterSpacing: '-0.03em',
+            lineHeight: 1.05,
+            margin: '0 0 14px',
+          }}>
+            {collection.title}
+          </h1>
+        )}
 
+        {/* Owner row — TODO: navigate to /users/${owner?.id} when public profiles exist */}
+        <button
+          onClick={() => {}}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 7,
+            marginBottom: 14,
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+          }}
+          onMouseEnter={e => {
+            const span = e.currentTarget.querySelector('span') as HTMLElement | null
+            if (span) span.style.color = '#EEEEEE'
+          }}
+          onMouseLeave={e => {
+            const span = e.currentTarget.querySelector('span') as HTMLElement | null
+            if (span) span.style.color = '#556a62'
+          }}
+        >
+          <div style={{
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            overflow: 'hidden',
+            background: 'rgba(111,207,151,0.08)',
+            border: '1px solid rgba(111,207,151,0.12)',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {owner?.avatarUrl ? (
+              <img
+                src={owner.avatarUrl}
+                alt={owner.username}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <span style={{
+                fontFamily: 'Syne, sans-serif',
+                fontSize: 9,
+                fontWeight: 700,
+                color: '#6FCF97',
+              }}>
+                {owner?.username?.[0]?.toUpperCase() ?? '?'}
+              </span>
+            )}
+          </div>
+          <span style={{
+            fontSize: 11,
+            color: '#556a62',
+            fontFamily: 'Outfit, sans-serif',
+            letterSpacing: '0.04em',
+            transition: 'color 0.15s',
+          }}>
+            @{owner?.username ?? '…'}
+          </span>
+        </button>
+
+        {/* Meta row */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: 16,
-          color: '#3a5e4a',
           fontSize: 11,
           letterSpacing: '0.06em',
         }}>
@@ -229,9 +441,69 @@ function CollectionHeader({ collection, color }: { collection: CollectionRespons
             {collection.locationIds.length}{' '}
             {collection.locationIds.length === 1 ? 'place' : 'places'}
           </span>
-          <span>·</span>
-          <span>Created {formatDate(collection.createdAt)}</span>
+          <span style={{ color: '#3a5e4a' }}>·</span>
+          <span style={{ color: '#3a5e4a' }}>Created {formatDate(collection.createdAt)}</span>
         </div>
+
+        {/* Edit action row */}
+        {editing && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginTop: 20,
+            animation: 'cp-fadeUp 0.18s ease both',
+          }}>
+            {mutation.isError && (
+              <span style={{ color: '#e05555', fontSize: 12, flex: 1 }}>
+                Failed to save. Try again.
+              </span>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+              <button
+                onClick={cancel}
+                disabled={mutation.isPending}
+                style={{
+                  padding: '7px 16px',
+                  border: '1px solid rgba(111,207,151,0.15)',
+                  borderRadius: 8,
+                  background: 'none',
+                  color: '#556a62',
+                  fontFamily: 'Outfit, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#EEEEEE' }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#556a62' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => mutation.mutate()}
+                disabled={!canSave}
+                style={{
+                  padding: '7px 18px',
+                  border: '1px solid rgba(111,207,151,0.35)',
+                  borderRadius: 8,
+                  background: canSave ? 'rgba(111,207,151,0.1)' : 'transparent',
+                  color: canSave ? '#6FCF97' : '#3a5e4a',
+                  fontFamily: 'Outfit, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: canSave ? 'pointer' : 'default',
+                  letterSpacing: '0.02em',
+                  transition: 'background 0.15s, color 0.15s',
+                  opacity: canSave ? 1 : 0.6,
+                  minWidth: 100,
+                }}
+              >
+                {mutation.isPending ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
