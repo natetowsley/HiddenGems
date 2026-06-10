@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut } from '@/api/client'
+import LocationSheet from '@/components/LocationSheet'
 import { useAuth } from '@/contexts/AuthContext'
 import type { CollectionResponse, LocationCategory, LocationResponse, PublicUserResponse } from '@/types'
 
@@ -63,10 +64,15 @@ export default function CollectionPage() {
       queryKey: ['location', locId],
       queryFn: () => apiGet<LocationResponse>(`/api/locations/${locId}`),
       enabled: !!collection,
+      retry: false,
     })),
   })
 
-  const locations = locationQueries.filter(q => q.data).map(q => q.data!)
+  const isAdmin = user?.app_metadata?.role === 'admin'
+  const allLocations = locationQueries.filter(q => q.data).map(q => q.data!)
+  const locations = allLocations.filter(loc =>
+    loc.status !== 'pending' || loc.createdBy === user?.id || isAdmin
+  )
   const locLoading = locationQueries.some(q => q.isLoading)
   const isLoading = collLoading || (!!collection && collection.locationIds.length > 0 && locLoading)
 
@@ -75,6 +81,8 @@ export default function CollectionPage() {
     queryFn: () => apiGet<PublicUserResponse>(`/api/users/${collection!.userId}`),
     enabled: !!collection,
   })
+
+  const [selectedLocation, setSelectedLocation] = useState<LocationResponse | null>(null)
 
   const color = collection ? accentColor(collection.title) : '#6FCF97'
   const isOwner = !!user && !!collection && collection.userId === user.id
@@ -160,13 +168,14 @@ export default function CollectionPage() {
                 gap: 12,
               }}>
                 {locations.map((loc, i) => (
-                  <LocationCard key={loc.id} location={loc} index={i} />
+                  <LocationCard key={loc.id} location={loc} index={i} onClick={() => setSelectedLocation(loc)} />
                 ))}
               </div>
             )}
           </>
         )}
       </div>
+      <LocationSheet location={selectedLocation} onClose={() => setSelectedLocation(null)} />
     </div>
   )
 }
@@ -509,7 +518,7 @@ function CollectionHeader({
   )
 }
 
-function LocationCard({ location, index }: { location: LocationResponse; index: number }) {
+function LocationCard({ location, index, onClick }: { location: LocationResponse; index: number; onClick: () => void }) {
   const [hovered, setHovered] = useState(false)
   const color = CATEGORY_COLOR[location.category]
   const snippet = location.description
@@ -518,9 +527,11 @@ function LocationCard({ location, index }: { location: LocationResponse; index: 
 
   return (
     <div
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
+        cursor: 'pointer',
         background: hovered ? 'rgba(9,23,17,0.9)' : 'rgba(9,23,17,0.7)',
         border: `1px solid ${hovered ? `${color}28` : 'rgba(111,207,151,0.07)'}`,
         borderRadius: 10,
