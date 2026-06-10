@@ -86,7 +86,7 @@ class UserServiceTest {
 
     @Test
     void updateUser_asOwner_updatesSuccessfully() {
-        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", "https://example.com/new.jpg");
+        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", "johndoe", "https://example.com/new.jpg");
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
         when(userRepository.save(any(User.class))).thenReturn(mockUser);
@@ -104,7 +104,7 @@ class UserServiceTest {
         adminUser.setRole(User.Role.admin);
         setId(adminUser, adminId);
 
-        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", null);
+        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", "johndoe", null);
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
         when(userRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
@@ -122,7 +122,7 @@ class UserServiceTest {
         User otherUser = new User("Other", "other", "other@example.com");
         setId(otherUser, otherId);
 
-        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", null);
+        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", "johndoe", null);
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
         when(userRepository.findById(otherId)).thenReturn(Optional.of(otherUser));
@@ -135,7 +135,7 @@ class UserServiceTest {
 
     @Test
     void updateUser_whenUserNotFound_throwsEntityNotFoundException() {
-        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", null);
+        UpdateUserRequest request = new UpdateUserRequest("Jane Doe", "johndoe", null);
 
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
