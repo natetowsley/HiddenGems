@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
+import { apiGet } from '@/api/client'
+import type { UserResponse } from '@/types'
 
 const NAV_ITEMS = [
   { label: 'Profile', path: '/profile' },
@@ -13,6 +16,12 @@ export default function NavBar() {
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  const { data: profile } = useQuery({
+    queryKey: ['users', 'me'],
+    queryFn: () => apiGet<UserResponse>('/api/users/me'),
+    staleTime: 5 * 60 * 1000,
+  })
+
   useEffect(() => {
     if (!open) return
     function handleClickOutside(e: MouseEvent) {
@@ -24,13 +33,14 @@ export default function NavBar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
 
-  const name = (user?.user_metadata?.name as string) || user?.email || ''
+  const name = profile?.name || (user?.user_metadata?.name as string) || user?.email || ''
   const initials = name
     .split(' ')
     .map((w: string) => w[0])
     .slice(0, 2)
     .join('')
     .toUpperCase()
+  const avatarUrl = profile?.avatarUrl
 
   async function handleSignOut() {
     setOpen(false)
@@ -81,9 +91,14 @@ export default function NavBar() {
             fontWeight: 700,
             letterSpacing: '0.04em',
             transition: 'background 0.15s, border-color 0.15s',
+            overflow: 'hidden',
+            padding: 0,
           }}
         >
-          {initials || '?'}
+          {avatarUrl
+            ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            : initials || '?'
+          }
         </button>
 
         {open && (
