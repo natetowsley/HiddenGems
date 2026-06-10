@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '@/api/client'
-import type { LocationCategory, LocationResponse, ReviewResponse } from '@/types'
+import type { LocationCategory, LocationResponse, PublicUserResponse, ReviewResponse } from '@/types'
 import './LocationSheet.css'
 
 const CATEGORY_COLOR: Record<LocationCategory, string> = {
@@ -107,6 +107,12 @@ export default function LocationSheet({ location, onClose }: Props) {
     enabled: !!loc,
   })
 
+  const { data: creator } = useQuery({
+    queryKey: ['user', loc?.createdBy],
+    queryFn: () => apiGet<PublicUserResponse>(`/api/users/${loc!.createdBy}`),
+    enabled: !!loc,
+  })
+
   const latStr = loc
     ? `${Math.abs(loc.lat).toFixed(4)}° ${loc.lat >= 0 ? 'N' : 'S'}`
     : ''
@@ -166,6 +172,22 @@ export default function LocationSheet({ location, onClose }: Props) {
               )}
               {loc.isPrivate && <span className="ls-private-badge">Private</span>}
             </div>
+
+            <button className="ls-creator" onClick={() => { /* TODO: navigate to /users/${creator?.id} */ }}>
+              <div className="ls-creator-avatar">
+                {creator?.avatarUrl ? (
+                  <img src={creator.avatarUrl} alt={creator.username} className="ls-creator-avatar-img" />
+                ) : (
+                  <span className="ls-creator-avatar-fallback">
+                    {creator?.username?.[0]?.toUpperCase() ?? '?'}
+                  </span>
+                )}
+              </div>
+              <span className="ls-creator-username">@{creator?.username ?? '…'}</span>
+              <svg className="ls-creator-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5h6M5.5 2.5L8 5l-2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
 
             <h2 className="ls-name">{loc.name}</h2>
 
