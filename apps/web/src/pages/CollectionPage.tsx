@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPut } from '@/api/client'
+import { apiGet, apiPut, apiDelete } from '@/api/client'
 import LocationSheet from '@/components/LocationSheet'
 import { useAuth } from '@/contexts/AuthContext'
 import type { CollectionResponse, LocationCategory, LocationResponse, PublicUserResponse } from '@/types'
@@ -24,6 +24,17 @@ const CATEGORY_LABEL: Record<LocationCategory, string> = {
   trail:      'Trail',
   activity:   'Activity',
   other:      'Other',
+}
+
+// Fix #6: distinguish 403 / 404 / auth-failure / server errors
+type ErrorKind = 'forbidden' | 'not-found' | 'auth' | 'server'
+
+function classifyError(error: unknown): ErrorKind {
+  if (!(error instanceof Error)) return 'server'
+  if (error.message.startsWith('403')) return 'forbidden'
+  if (error.message.startsWith('404')) return 'not-found'
+  if (error.message.startsWith('401') || error.message === 'Not authenticated') return 'auth'
+  return 'server'
 }
 
 function accentColor(title: string): string {
@@ -86,8 +97,11 @@ export default function CollectionPage() {
 
   const color = collection ? accentColor(collection.title) : '#6FCF97'
   const isOwner = !!user && !!collection && collection.userId === user.id
-  const is403 = isError && error instanceof Error && error.message.startsWith('403')
-  const is404 = isError && !is403
+  const errorKind: ErrorKind | null = isError ? classifyError(error) : null
+
+  useEffect(() => {
+    if (errorKind === 'auth') navigate('/login', { replace: true })
+  }, [errorKind, navigate])
 
   return (
     <div style={{
@@ -137,10 +151,12 @@ export default function CollectionPage() {
           Back
         </button>
 
-        {is403 ? (
+        {errorKind === 'forbidden' ? (
           <PrivateCollectionState />
-        ) : is404 ? (
+        ) : errorKind === 'not-found' ? (
           <NotFoundState />
+        ) : errorKind === 'server' ? (
+          <ServerErrorState />
         ) : (
           <>
             {/* Header */}
@@ -192,8 +208,18 @@ function CollectionHeader({
   owner?: PublicUserResponse
 }) {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [draft, setDraft] = useState({ title: collection.title, isPrivate: collection.isPrivate })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiDelete(`/api/collections/${collection.id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collections'] })
+      navigate('/profile')
+    },
+  })
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -249,34 +275,58 @@ function CollectionHeader({
 
       <div style={{ position: 'relative', zIndex: 1 }}>
 
-        {/* Edit button — owner only, view mode only */}
-        {isOwner && !editing && (
-          <button
-            onClick={startEdit}
-            title="Edit collection"
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 6,
-              borderRadius: 6,
-              color: '#3a5e4a',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#6FCF97' }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#3a5e4a' }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </button>
+        {/* Owner action buttons — view mode only, hidden while confirming delete */}
+        {isOwner && !editing && !confirmDelete && (
+          <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', gap: 4 }}>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              title="Delete collection"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 6,
+                borderRadius: 6,
+                color: '#3a5e4a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#e05555' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#3a5e4a' }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            </button>
+            <button
+              onClick={startEdit}
+              title="Edit collection"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 6,
+                borderRadius: 6,
+                color: '#3a5e4a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#6FCF97' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#3a5e4a' }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+          </div>
         )}
 
         {/* Privacy badge / toggle */}
@@ -376,28 +426,12 @@ function CollectionHeader({
           </h1>
         )}
 
-        {/* Owner row — TODO: navigate to /users/${owner?.id} when public profiles exist */}
-        <button
-          onClick={() => {}}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            marginBottom: 14,
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-          }}
-          onMouseEnter={e => {
-            const span = e.currentTarget.querySelector('span') as HTMLElement | null
-            if (span) span.style.color = '#EEEEEE'
-          }}
-          onMouseLeave={e => {
-            const span = e.currentTarget.querySelector('span') as HTMLElement | null
-            if (span) span.style.color = '#556a62'
-          }}
-        >
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 7,
+          marginBottom: 14,
+        }}>
           <div style={{
             width: 20,
             height: 20,
@@ -432,11 +466,10 @@ function CollectionHeader({
             color: '#556a62',
             fontFamily: 'Outfit, sans-serif',
             letterSpacing: '0.04em',
-            transition: 'color 0.15s',
           }}>
             @{owner?.username ?? '…'}
           </span>
-        </button>
+        </div>
 
         {/* Meta row */}
         <div style={{
@@ -453,6 +486,70 @@ function CollectionHeader({
           <span style={{ color: '#3a5e4a' }}>·</span>
           <span style={{ color: '#3a5e4a' }}>Created {formatDate(collection.createdAt)}</span>
         </div>
+
+        {/* Delete confirm row */}
+        {confirmDelete && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginTop: 20,
+            animation: 'cp-fadeUp 0.18s ease both',
+          }}>
+            {deleteMutation.isError ? (
+              <span style={{ color: '#e05555', fontSize: 12, flex: 1 }}>
+                Failed to delete. Try again.
+              </span>
+            ) : (
+              <span style={{ color: '#556a62', fontSize: 12, flex: 1, lineHeight: 1.4 }}>
+                Delete this collection? This cannot be undone.
+              </span>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+              <button
+                onClick={() => { setConfirmDelete(false); deleteMutation.reset() }}
+                disabled={deleteMutation.isPending}
+                style={{
+                  padding: '7px 16px',
+                  border: '1px solid rgba(111,207,151,0.15)',
+                  borderRadius: 8,
+                  background: 'none',
+                  color: '#556a62',
+                  fontFamily: 'Outfit, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#EEEEEE' }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#556a62' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                style={{
+                  padding: '7px 18px',
+                  border: '1px solid rgba(224,85,85,0.35)',
+                  borderRadius: 8,
+                  background: deleteMutation.isPending ? 'transparent' : 'rgba(224,85,85,0.1)',
+                  color: deleteMutation.isPending ? '#3a5e4a' : '#e05555',
+                  fontFamily: 'Outfit, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: deleteMutation.isPending ? 'default' : 'pointer',
+                  letterSpacing: '0.02em',
+                  transition: 'background 0.15s, color 0.15s',
+                  opacity: deleteMutation.isPending ? 0.6 : 1,
+                  minWidth: 80,
+                }}
+              >
+                {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Edit action row */}
         {editing && (
@@ -736,6 +833,51 @@ function NotFoundState() {
         margin: '0 auto 28px',
       }}>
         This link may be broken or the collection may have been deleted.
+      </div>
+      <button
+        onClick={() => navigate(-1)}
+        style={{
+          padding: '8px 20px',
+          border: '1px solid rgba(111,207,151,0.16)',
+          borderRadius: 8,
+          background: 'transparent',
+          color: '#556a62',
+          fontSize: 12,
+          fontFamily: 'Outfit, sans-serif',
+          fontWeight: 500,
+          cursor: 'pointer',
+          letterSpacing: '0.04em',
+        }}
+      >
+        Go back
+      </button>
+    </div>
+  )
+}
+
+function ServerErrorState() {
+  const navigate = useNavigate()
+  return (
+    <div style={{ textAlign: 'center', padding: '64px 32px', animation: 'cp-fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) both' }}>
+      <div style={{ color: '#2d5248', fontSize: 28, marginBottom: 16, lineHeight: 1 }}>◈</div>
+      <div style={{
+        fontFamily: 'Syne, sans-serif',
+        fontSize: 18,
+        fontWeight: 700,
+        color: '#EEEEEE',
+        marginBottom: 10,
+        letterSpacing: '-0.02em',
+      }}>
+        Something went wrong
+      </div>
+      <div style={{
+        fontSize: 13,
+        color: '#3a5e4a',
+        lineHeight: 1.65,
+        maxWidth: 280,
+        margin: '0 auto 28px',
+      }}>
+        An unexpected error occurred. Please try again.
       </div>
       <button
         onClick={() => navigate(-1)}

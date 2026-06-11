@@ -22,6 +22,8 @@ export default function AddToCollectionModal({ locationId, isOpen, onClose }: Pr
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newPrivate, setNewPrivate] = useState(false)
+  // Fix #8: track which collection IDs have an in-flight mutation
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
 
   const { data: collections = [], isLoading } = useQuery({
     queryKey: ['collections'],
@@ -29,25 +31,40 @@ export default function AddToCollectionModal({ locationId, isOpen, onClose }: Pr
     enabled: isOpen,
   })
 
-  const addMutation = useMutation({
-    mutationFn: (collectionId: string) =>
-      apiPost<CollectionResponse>(`/api/collections/${collectionId}/items`, { locationId }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['collections'] }),
+  // Fix #8: single mutation with per-collection pending tracking replaces the
+  // old addMutation + removeMutation pair, preventing rapid-click desyncs
+  const toggleMutation = useMutation({
+    mutationFn: ({ collectionId, adding }: { collectionId: string; adding: boolean }) =>
+      adding
+        ? apiPost<CollectionResponse>(`/api/collections/${collectionId}/items`, { locationId })
+        : apiDelete(`/api/collections/${collectionId}/items/${locationId}`),
+    onMutate: ({ collectionId }) => {
+      setPendingIds(prev => new Set(prev).add(collectionId))
+    },
+    onSettled: (_, __, { collectionId }) => {
+      setPendingIds(prev => {
+        const next = new Set(prev)
+        next.delete(collectionId)
+        return next
+      })
+      qc.invalidateQueries({ queryKey: ['collections'] })
+    },
   })
 
-  const removeMutation = useMutation({
-    mutationFn: (collectionId: string) =>
-      apiDelete(`/api/collections/${collectionId}/items/${locationId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['collections'] }),
-  })
-
+  // Fix #5: if adding the location fails, delete the just-created collection
+  // so we don't leave behind an empty orphan the user never intended to keep
   const createMutation = useMutation({
     mutationFn: async () => {
       const col = await apiPost<CollectionResponse>('/api/collections', {
         title: newTitle.trim(),
         isPrivate: newPrivate,
       })
-      await apiPost<CollectionResponse>(`/api/collections/${col.id}/items`, { locationId })
+      try {
+        await apiPost<CollectionResponse>(`/api/collections/${col.id}/items`, { locationId })
+      } catch (err) {
+        await apiDelete(`/api/collections/${col.id}`).catch(() => {})
+        throw err
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['collections'] })
@@ -58,11 +75,9 @@ export default function AddToCollectionModal({ locationId, isOpen, onClose }: Pr
   })
 
   function toggle(col: CollectionResponse) {
-    if (col.locationIds.includes(locationId)) {
-      removeMutation.mutate(col.id)
-    } else {
-      addMutation.mutate(col.id)
-    }
+    if (pendingIds.has(col.id)) return
+    const adding = !col.locationIds.includes(locationId)
+    toggleMutation.mutate({ collectionId: col.id, adding })
   }
 
   if (!isOpen) return null
@@ -130,6 +145,11 @@ export default function AddToCollectionModal({ locationId, isOpen, onClose }: Pr
                   </button>
                 </div>
               </div>
+              {createMutation.isError && (
+                <p style={{ color: '#e05555', fontSize: 11, margin: '8px 0 0', fontFamily: 'Outfit, sans-serif' }}>
+                  Failed to add location. Try again.
+                </p>
+              )}
             </div>
           ) : (
             <button className="atcm-new-row" onClick={() => setCreating(true)}>
@@ -161,11 +181,14 @@ export default function AddToCollectionModal({ locationId, isOpen, onClose }: Pr
               {collections.map(col => {
                 const color = accentColor(col.title)
                 const inCollection = col.locationIds.includes(locationId)
+                const isPending = pendingIds.has(col.id)
                 return (
                   <li key={col.id}>
                     <button
                       className={`atcm-item${inCollection ? ' atcm-item--in' : ''}`}
                       onClick={() => toggle(col)}
+                      disabled={isPending}
+                      style={isPending ? { opacity: 0.5, cursor: 'default' } : undefined}
                     >
                       <div
                         className="atcm-thumb"
