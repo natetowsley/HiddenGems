@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiPost } from '@/api/client'
 import type { UserResponse, CollectionResponse, LocationResponse, LocationCategory } from '@/types'
+import LocationSheet from '@/components/LocationSheet'
 
 const KEYFRAMES = `
 @keyframes pg-fadeUp {
@@ -41,9 +42,12 @@ export default function ProfilePage() {
     staleTime: 5 * 60 * 1000,
   })
 
+  const [selectedLocation, setSelectedLocation] = useState<LocationResponse | null>(null)
+
   return (
     <>
       <style>{KEYFRAMES}</style>
+      <LocationSheet location={selectedLocation} onClose={() => setSelectedLocation(null)} />
       <div style={{
         width: '100vw',
         minHeight: '100vh',
@@ -69,7 +73,7 @@ export default function ProfilePage() {
           <ProfileCard profile={profile} />
         ) : null}
         {profile && <CollectionsSection />}
-        {profile && <LocationsSection profileId={profile.id} />}
+        {profile && <LocationsSection profileId={profile.id} onSelect={setSelectedLocation} />}
       </div>
     </>
   )
@@ -642,7 +646,7 @@ const CATEGORY_LABEL: Record<LocationCategory, string> = {
   other:      'Other',
 }
 
-function LocationsSection({ profileId }: { profileId: string }) {
+function LocationsSection({ profileId, onSelect }: { profileId: string; onSelect: (loc: LocationResponse) => void }) {
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['userLocations', profileId],
     queryFn: () => apiGet<LocationResponse[]>(`/api/users/${profileId}/locations`),
@@ -714,7 +718,7 @@ function LocationsSection({ profileId }: { profileId: string }) {
           scrollbarColor: 'rgba(111,207,151,0.15) transparent',
         }}>
           {locations.map((loc, i) => (
-            <LocationRow key={loc.id} location={loc} index={i} />
+            <LocationRow key={loc.id} location={loc} index={i} onSelect={() => onSelect(loc)} />
           ))}
         </div>
       )}
@@ -722,12 +726,13 @@ function LocationsSection({ profileId }: { profileId: string }) {
   )
 }
 
-function LocationRow({ location, index }: { location: LocationResponse; index: number }) {
+function LocationRow({ location, index, onSelect }: { location: LocationResponse; index: number; onSelect: () => void }) {
   const [hovered, setHovered] = useState(false)
   const color = CATEGORY_COLOR[location.category]
 
   return (
     <div
+      onClick={onSelect}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -740,6 +745,7 @@ function LocationRow({ location, index }: { location: LocationResponse; index: n
         background: hovered ? 'rgba(9,23,17,0.7)' : 'rgba(9,23,17,0.4)',
         transition: 'border-color 0.15s, background 0.15s',
         animation: `pg-fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) ${0.48 + index * 0.04}s both`,
+        cursor: 'pointer',
       }}
     >
       {/* Category dot */}
