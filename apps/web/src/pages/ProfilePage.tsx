@@ -42,6 +42,19 @@ export default function ProfilePage() {
     staleTime: 5 * 60 * 1000,
   })
 
+  const { data: collections } = useQuery({
+    queryKey: ['collections'],
+    queryFn: () => apiGet<CollectionResponse[]>('/api/collections'),
+    enabled: !!profile,
+  })
+
+  const { data: myLocations } = useQuery({
+    queryKey: ['userLocations', profile?.id ?? ''],
+    queryFn: () => apiGet<LocationResponse[]>(`/api/users/${profile!.id}/locations`),
+    enabled: !!profile,
+  })
+
+  const activityLoaded = collections !== undefined && myLocations !== undefined
   const [selectedLocation, setSelectedLocation] = useState<LocationResponse | null>(null)
 
   return (
@@ -70,8 +83,16 @@ export default function ProfilePage() {
         ) : isError ? (
           <ErrorCard />
         ) : profile ? (
-          <ProfileCard profile={profile} />
+          <ProfileCard
+            profile={profile}
+            locationCount={myLocations?.length ?? 0}
+            collectionCount={collections?.length ?? 0}
+            activityLoaded={activityLoaded}
+          />
         ) : null}
+        {profile && activityLoaded && (myLocations?.length ?? 0) === 0 && (collections?.length ?? 0) === 0 && (
+          <OnboardingNudge />
+        )}
         {profile && <CollectionsSection />}
         {profile && <LocationsSection profileId={profile.id} onSelect={setSelectedLocation} />}
       </div>
@@ -85,7 +106,12 @@ interface Draft {
   avatarUrl: string | null
 }
 
-function ProfileCard({ profile }: { profile: UserResponse }) {
+function ProfileCard({ profile, locationCount, collectionCount, activityLoaded }: {
+  profile: UserResponse
+  locationCount: number
+  collectionCount: number
+  activityLoaded: boolean
+}) {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Draft>({
@@ -310,8 +336,45 @@ function ProfileCard({ profile }: { profile: UserResponse }) {
 
         {/* Detail rows */}
         <div>
-          <DetailRow label="Email"  value={profile.email}            delay={0.18} last={false} />
-          <DetailRow label="Joined" value={formatDate(profile.createdAt)} delay={0.25} last={!editing} />
+          <DetailRow label="Email"  value={profile.email}                delay={0.18} last={false} />
+          <DetailRow label="Joined" value={formatDate(profile.createdAt)} delay={0.25} last={false} />
+          {activityLoaded && (
+            <div style={{
+              display: 'flex',
+              borderBottom: editing ? '1px solid rgba(111,207,151,0.06)' : 'none',
+              animation: 'pg-fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) 0.32s both',
+            }}>
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '16px 0',
+                borderRight: '1px solid rgba(111,207,151,0.06)',
+              }}>
+                <span style={{ color: '#EEEEEE', fontSize: 22, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.03em' }}>
+                  {locationCount}
+                </span>
+                <span style={{ color: '#3a5e4a', fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', marginTop: 5 }}>
+                  {locationCount === 1 ? 'Location' : 'Locations'}
+                </span>
+              </div>
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '16px 0',
+              }}>
+                <span style={{ color: '#EEEEEE', fontSize: 22, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.03em' }}>
+                  {collectionCount}
+                </span>
+                <span style={{ color: '#3a5e4a', fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', marginTop: 5 }}>
+                  {collectionCount === 1 ? 'Collection' : 'Collections'}
+                </span>
+              </div>
+            </div>
+          )}
 
           {editing && (
             <div style={{
@@ -815,6 +878,55 @@ function LocationRow({ location, index, onSelect }: { location: LocationResponse
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+function OnboardingNudge() {
+  const navigate = useNavigate()
+  return (
+    <div style={{
+      width: '100%',
+      maxWidth: 460,
+      marginTop: 12,
+      padding: '16px 24px',
+      border: '1px solid rgba(111,207,151,0.1)',
+      borderRadius: 12,
+      background: 'rgba(9,23,17,0.6)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 16,
+      animation: 'pg-fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.32s both',
+    }}>
+      <div>
+        <div style={{ color: '#EEEEEE', fontSize: 13, fontWeight: 600, marginBottom: 4, fontFamily: 'Outfit, sans-serif' }}>
+          Nothing here yet
+        </div>
+        <div style={{ color: '#3a5e4a', fontSize: 12, lineHeight: 1.5, fontFamily: 'Outfit, sans-serif' }}>
+          Explore the map to discover and save hidden gems.
+        </div>
+      </div>
+      <button
+        onClick={() => navigate('/')}
+        style={{
+          padding: '7px 16px',
+          border: '1px solid rgba(111,207,151,0.24)',
+          borderRadius: 8,
+          background: 'rgba(111,207,151,0.08)',
+          color: '#6FCF97',
+          fontSize: 12,
+          fontFamily: 'Outfit, sans-serif',
+          fontWeight: 500,
+          cursor: 'pointer',
+          letterSpacing: '0.04em',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          transition: 'background 0.15s',
+        }}
+      >
+        Explore
+      </button>
     </div>
   )
 }
