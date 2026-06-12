@@ -30,6 +30,20 @@ public class UserController {
         this.collectionService = collectionService;
     }
 
+    // GET /api/users/username/{username}
+    @GetMapping("/username/{username}")
+    public ResponseEntity<?> getUserByUsername(@PathVariable String username, JwtAuthenticationToken auth) {
+        UUID requesterId = UUID.fromString(auth.getName());
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        UUID targetId = userService.getIdByUsername(username);
+        boolean isSelf = targetId.equals(requesterId);
+        if (isSelf || isAdmin) {
+            return ResponseEntity.ok(userService.getById(targetId));
+        }
+        return ResponseEntity.ok(userService.getPublicByUsername(username));
+    }
+
     // GET /api/users/{id}
     @GetMapping("/{id}")
     public ResponseEntity<?> getUserById(@PathVariable UUID id, JwtAuthenticationToken auth) {

@@ -16,6 +16,8 @@ export interface PublicUserResponse {
   name: string
   username: string
   avatarUrl: string | null
+  role: UserRole
+  createdAt: string
 }
 
 export type LocationCategory =

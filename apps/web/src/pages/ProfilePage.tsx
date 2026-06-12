@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiPost } from '@/api/client'
-import type { UserResponse, CollectionResponse, LocationResponse, LocationCategory } from '@/types'
+import type { UserResponse, PublicUserResponse, CollectionResponse, LocationResponse, LocationCategory } from '@/types'
 import LocationSheet from '@/components/LocationSheet'
+import { useAuth } from '@/contexts/AuthContext'
+
+type ProfileShape = UserResponse | PublicUserResponse
 
 const KEYFRAMES = `
 @keyframes pg-fadeUp {
@@ -36,17 +39,39 @@ function getInitials(name: string) {
 }
 
 export default function ProfilePage() {
+  const { username } = useParams<{ username?: string }>()
+  const { user: authUser } = useAuth()
+  const navigate = useNavigate()
+  const isOwner = !username
+
   const { data: profile, isLoading, isError } = useQuery({
-    queryKey: ['users', 'me'],
-    queryFn: () => apiGet<UserResponse>('/api/users/me'),
+    queryKey: username ? ['users', 'username', username] : ['users', 'me'],
+    queryFn: () => username
+      ? apiGet<PublicUserResponse>(`/api/users/username/${username}`)
+      : apiGet<UserResponse>('/api/users/me'),
     staleTime: 5 * 60 * 1000,
   })
 
-  const { data: collections } = useQuery({
+  // Redirect to own profile if someone navigates to /users/their-own-username
+  useEffect(() => {
+    if (username && profile && authUser && profile.id === authUser.id) {
+      navigate('/profile', { replace: true })
+    }
+  }, [username, profile, authUser, navigate])
+
+  const { data: ownCollections } = useQuery({
     queryKey: ['collections'],
     queryFn: () => apiGet<CollectionResponse[]>('/api/collections'),
-    enabled: !!profile,
+    enabled: isOwner && !!profile,
   })
+
+  const { data: otherCollections } = useQuery({
+    queryKey: ['userCollections', profile?.id ?? ''],
+    queryFn: () => apiGet<CollectionResponse[]>(`/api/users/${profile!.id}/collections`),
+    enabled: !isOwner && !!profile,
+  })
+
+  const collections = isOwner ? ownCollections : otherCollections
 
   const { data: myLocations } = useQuery({
     queryKey: ['userLocations', profile?.id ?? ''],
@@ -85,16 +110,17 @@ export default function ProfilePage() {
         ) : profile ? (
           <ProfileCard
             profile={profile}
+            isOwner={isOwner}
             locationCount={myLocations?.length ?? 0}
             collectionCount={collections?.length ?? 0}
             activityLoaded={activityLoaded}
           />
         ) : null}
-        {profile && activityLoaded && (myLocations?.length ?? 0) === 0 && (collections?.length ?? 0) === 0 && (
+        {profile && isOwner && activityLoaded && (myLocations?.length ?? 0) === 0 && (collections?.length ?? 0) === 0 && (
           <OnboardingNudge />
         )}
-        {profile && <CollectionsSection />}
-        {profile && <LocationsSection profileId={profile.id} onSelect={setSelectedLocation} />}
+        {profile && <CollectionsSection profileId={profile.id} isOwner={isOwner} />}
+        {profile && <LocationsSection profileId={profile.id} isOwner={isOwner} onSelect={setSelectedLocation} />}
       </div>
     </>
   )
@@ -106,8 +132,9 @@ interface Draft {
   avatarUrl: string | null
 }
 
-function ProfileCard({ profile, locationCount, collectionCount, activityLoaded }: {
-  profile: UserResponse
+function ProfileCard({ profile, isOwner, locationCount, collectionCount, activityLoaded }: {
+  profile: ProfileShape
+  isOwner: boolean
   locationCount: number
   collectionCount: number
   activityLoaded: boolean
@@ -168,7 +195,7 @@ function ProfileCard({ profile, locationCount, collectionCount, activityLoaded }
         marginBottom: 24,
         animation: 'pg-fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both',
       }}>
-        Explorer Profile
+        {isOwner ? 'Explorer Profile' : `@${profile.username}`}
       </div>
 
       {/* Card */}
@@ -191,7 +218,7 @@ function ProfileCard({ profile, locationCount, collectionCount, activityLoaded }
           borderBottom: '1px solid rgba(111,207,151,0.08)',
           animation: 'pg-fadeUp 0.52s cubic-bezier(0.22,1,0.36,1) 0.07s both',
         }}>
-          {!editing && <EditButton onClick={handleEdit} />}
+          {isOwner && !editing && <EditButton onClick={handleEdit} />}
 
           {/* Avatar */}
           <div style={{
@@ -336,7 +363,9 @@ function ProfileCard({ profile, locationCount, collectionCount, activityLoaded }
 
         {/* Detail rows */}
         <div>
-          <DetailRow label="Email"  value={profile.email}                delay={0.18} last={false} />
+          {'email' in profile && (
+            <DetailRow label="Email" value={profile.email} delay={0.18} last={false} />
+          )}
           <DetailRow label="Joined" value={formatDate(profile.createdAt)} delay={0.25} last={false} />
           {activityLoaded && (
             <div style={{
@@ -454,7 +483,7 @@ function accentColor(title: string): string {
   return palette[h % palette.length]
 }
 
-function CollectionsSection() {
+function CollectionsSection({ profileId, isOwner }: { profileId: string; isOwner: boolean }) {
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -489,8 +518,10 @@ function CollectionsSection() {
   }, [])
 
   const { data: collections = [] } = useQuery({
-    queryKey: ['collections'],
-    queryFn: () => apiGet<CollectionResponse[]>('/api/collections'),
+    queryKey: isOwner ? ['collections'] : ['userCollections', profileId],
+    queryFn: isOwner
+      ? () => apiGet<CollectionResponse[]>('/api/collections')
+      : () => apiGet<CollectionResponse[]>(`/api/users/${profileId}/collections`),
   })
 
   const createMutation = useMutation({
@@ -541,7 +572,7 @@ function CollectionsSection() {
       </div>
 
       {/* Inline create form */}
-      {creating && (
+      {isOwner && creating && (
         <div style={{
           marginBottom: 14,
           padding: '12px 14px',
@@ -633,7 +664,7 @@ function CollectionsSection() {
         }}
       >
         {/* New collection tile */}
-        <button
+        {isOwner && <button
           onClick={() => setCreating(true)}
           onMouseEnter={() => setNewHovered(true)}
           onMouseLeave={() => setNewHovered(false)}
@@ -677,7 +708,7 @@ function CollectionsSection() {
             color: '#3a5e4a',
             letterSpacing: '0.06em',
           }}>New</span>
-        </button>
+        </button>}
 
         {collections.map(col => (
           <CollectionTile key={col.id} collection={col} />
@@ -709,7 +740,7 @@ const CATEGORY_LABEL: Record<LocationCategory, string> = {
   other:      'Other',
 }
 
-function LocationsSection({ profileId, onSelect }: { profileId: string; onSelect: (loc: LocationResponse) => void }) {
+function LocationsSection({ profileId, isOwner, onSelect }: { profileId: string; isOwner: boolean; onSelect: (loc: LocationResponse) => void }) {
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['userLocations', profileId],
     queryFn: () => apiGet<LocationResponse[]>(`/api/users/${profileId}/locations`),
@@ -735,7 +766,7 @@ function LocationsSection({ profileId, onSelect }: { profileId: string; onSelect
           fontWeight: 600,
           letterSpacing: '0.24em',
           textTransform: 'uppercase',
-        }}>My Locations</span>
+        }}>{isOwner ? 'My Locations' : 'Locations'}</span>
         <span style={{
           fontSize: 9,
           color: '#6FCF97',
@@ -767,7 +798,7 @@ function LocationsSection({ profileId, onSelect }: { profileId: string; onSelect
           fontSize: 12,
           letterSpacing: '0.04em',
         }}>
-          No locations yet.
+          {isOwner ? 'No locations yet.' : 'No public locations.'}
         </div>
       ) : (
         <div style={{

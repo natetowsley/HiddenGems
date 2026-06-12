@@ -34,6 +34,7 @@ export function AppRouter() {
         <Route element={<RequireAuth><AuthLayout /></RequireAuth>}>
           <Route path="/" element={<MapPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/users/:username" element={<ProfilePage />} />
           <Route path="/collections/:id" element={<CollectionPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
