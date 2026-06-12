@@ -14,10 +14,8 @@ import com.hiddengems.api.repository.ReviewRepository;
 import com.hiddengems.api.repository.ReviewVoteRepository;
 import com.hiddengems.api.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -102,7 +100,7 @@ public class UserService {
         checkOwnership(user, requesterId);
 
         if (!user.getUsername().equals(request.username()) && userRepository.existsByUsername(request.username())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already taken");
+            throw new IllegalStateException("Username already taken");
         }
 
         user.setName(request.name());

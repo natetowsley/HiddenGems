@@ -160,6 +160,7 @@ function ProfileCard({ profile, isOwner, locationCount, collectionCount, activit
     },
   })
 
+  const usernameTaken = mutation.isError && mutation.error instanceof Error && mutation.error.message.includes('409')
   const isAdmin = profile.role === 'admin'
   const displayName = editing ? draft.name : profile.name
   const displayInitials = getInitials(displayName || profile.name)
@@ -298,36 +299,53 @@ function ProfileCard({ profile, isOwner, locationCount, collectionCount, activit
 
           {/* Username */}
           {editing ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginBottom: 16,
-              borderBottom: '1px solid rgba(111,207,151,0.3)',
-              paddingBottom: 5,
-            }}>
-              <span style={{
-                color: 'rgba(111,207,151,0.8)',
-                fontSize: 13,
-                fontWeight: 500,
-                userSelect: 'none',
-              }}>@</span>
-              <input
-                value={draft.username}
-                onChange={e => setDraft(d => ({ ...d, username: e.target.value }))}
-                placeholder="username"
-                maxLength={255}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'rgba(111,207,151,0.9)',
+            <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                borderBottom: `1px solid ${usernameTaken ? 'rgba(224,85,85,0.5)' : 'rgba(111,207,151,0.3)'}`,
+                paddingBottom: 5,
+                transition: 'border-color 0.15s',
+              }}>
+                <span style={{
+                  color: usernameTaken ? 'rgba(224,85,85,0.8)' : 'rgba(111,207,151,0.8)',
                   fontSize: 13,
                   fontWeight: 500,
-                  fontFamily: 'Outfit, sans-serif',
-                  outline: 'none',
-                  minWidth: 80,
-                  letterSpacing: '0.01em',
-                }}
-              />
+                  userSelect: 'none',
+                  transition: 'color 0.15s',
+                }}>@</span>
+                <input
+                  value={draft.username}
+                  onChange={e => {
+                    if (usernameTaken) mutation.reset()
+                    setDraft(d => ({ ...d, username: e.target.value }))
+                  }}
+                  placeholder="username"
+                  maxLength={255}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: usernameTaken ? 'rgba(224,85,85,0.9)' : 'rgba(111,207,151,0.9)',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    fontFamily: 'Outfit, sans-serif',
+                    outline: 'none',
+                    minWidth: 80,
+                    letterSpacing: '0.01em',
+                    transition: 'color 0.15s',
+                  }}
+                />
+              </div>
+              {usernameTaken && (
+                <span style={{
+                  fontSize: 11,
+                  color: '#e05555',
+                  letterSpacing: '0.02em',
+                  animation: 'pg-fade-in 0.15s ease both',
+                }}>
+                  Username already taken
+                </span>
+              )}
             </div>
           ) : (
             <div style={{
@@ -456,11 +474,9 @@ function ProfileCard({ profile, isOwner, locationCount, collectionCount, activit
             gap: 12,
             animation: 'pg-fade-in 0.2s ease both',
           }}>
-            {mutation.isError && (
+            {mutation.isError && !usernameTaken && (
               <span style={{ color: '#e05555', fontSize: 12, flex: 1 }}>
-                {mutation.error instanceof Error && mutation.error.message.includes('409')
-                  ? 'Username already taken.'
-                  : 'Failed to save. Try again.'}
+                Failed to save. Try again.
               </span>
             )}
             <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
