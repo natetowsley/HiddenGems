@@ -181,7 +181,7 @@ export default function CollectionPage() {
             {isLoading ? (
               <LocationsGridSkeleton count={collection?.locationIds.length ?? 4} />
             ) : collection && collection.locationIds.length === 0 ? (
-              <EmptyState />
+              <EmptyState isOwner={isOwner} />
             ) : (
               <div style={{
                 display: 'grid',
@@ -439,12 +439,22 @@ function CollectionHeader({
           </h1>
         )}
 
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 7,
-          marginBottom: 14,
-        }}>
+        <button
+          onClick={() => owner?.username && navigate(`/users/${owner.username}`)}
+          disabled={!owner?.username}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 7,
+            marginBottom: 14,
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: owner?.username ? 'pointer' : 'default',
+          }}
+          onMouseEnter={e => { if (owner?.username) e.currentTarget.style.opacity = '0.75' }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+        >
           <div style={{
             width: 20,
             height: 20,
@@ -482,7 +492,7 @@ function CollectionHeader({
           }}>
             @{owner?.username ?? '…'}
           </span>
-        </div>
+        </button>
 
         {/* Meta row */}
         <div style={{
@@ -761,7 +771,7 @@ function LocationCard({
   )
 }
 
-function EmptyState() {
+function EmptyState({ isOwner }: { isOwner: boolean }) {
   const navigate = useNavigate()
   return (
     <div style={{
@@ -777,26 +787,30 @@ function EmptyState() {
       <div style={{ color: '#EEEEEE', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>
         Nothing here yet
       </div>
-      <div style={{ color: '#3a5e4a', fontSize: 12, marginBottom: 24, lineHeight: 1.6 }}>
-        Add locations to this collection from the map.
+      <div style={{ color: '#3a5e4a', fontSize: 12, marginBottom: isOwner ? 24 : 0, lineHeight: 1.6 }}>
+        {isOwner
+          ? 'Add locations to this collection from the map.'
+          : 'This collection is empty.'}
       </div>
-      <button
-        onClick={() => navigate('/')}
-        style={{
-          padding: '8px 20px',
-          border: '1px solid rgba(111,207,151,0.24)',
-          borderRadius: 8,
-          background: 'rgba(111,207,151,0.08)',
-          color: '#6FCF97',
-          fontSize: 12,
-          fontFamily: 'Outfit, sans-serif',
-          fontWeight: 500,
-          cursor: 'pointer',
-          letterSpacing: '0.04em',
-        }}
-      >
-        Explore the map
-      </button>
+      {isOwner && (
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            padding: '8px 20px',
+            border: '1px solid rgba(111,207,151,0.24)',
+            borderRadius: 8,
+            background: 'rgba(111,207,151,0.08)',
+            color: '#6FCF97',
+            fontSize: 12,
+            fontFamily: 'Outfit, sans-serif',
+            fontWeight: 500,
+            cursor: 'pointer',
+            letterSpacing: '0.04em',
+          }}
+        >
+          Explore the map
+        </button>
+      )}
     </div>
   )
 }

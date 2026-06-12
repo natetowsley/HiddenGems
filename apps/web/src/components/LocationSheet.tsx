@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '@/api/client'
 import type { LocationCategory, LocationResponse, PublicUserResponse, ReviewResponse } from '@/types'
@@ -92,6 +93,7 @@ interface Props {
 }
 
 export default function LocationSheet({ location, onClose }: Props) {
+  const navigate = useNavigate()
   // Keep last non-null location displayed during slide-out animation
   const [displayed, setDisplayed] = useState<LocationResponse | null>(location)
   const [collectionOpen, setCollectionOpen] = useState(false)
@@ -179,7 +181,7 @@ export default function LocationSheet({ location, onClose }: Props) {
               {loc.isPrivate && <span className="ls-private-badge">Private</span>}
             </div>
 
-            <button className="ls-creator" onClick={() => { /* TODO: navigate to /users/${creator?.id} */ }}>
+            <button className="ls-creator" onClick={() => creator?.username && navigate(`/users/${creator.username}`)}>
               <div className="ls-creator-avatar">
                 {creator?.avatarUrl ? (
                   <img src={creator.avatarUrl} alt={creator.username} className="ls-creator-avatar-img" />
