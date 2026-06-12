@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiPost } from '@/api/client'
-import type { UserResponse, CollectionResponse } from '@/types'
+import type { UserResponse, CollectionResponse, LocationResponse, LocationCategory } from '@/types'
 
 const KEYFRAMES = `
 @keyframes pg-fadeUp {
@@ -21,7 +21,9 @@ const KEYFRAMES = `
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-.pg-col-scroll::-webkit-scrollbar { display: none; }
+.pg-col-scroll::-webkit-scrollbar { height: 3px; }
+.pg-col-scroll::-webkit-scrollbar-track { background: transparent; }
+.pg-col-scroll::-webkit-scrollbar-thumb { background: rgba(111,207,151,0.15); border-radius: 999px; }
 `
 
 function formatDate(iso: string) {
@@ -67,6 +69,7 @@ export default function ProfilePage() {
           <ProfileCard profile={profile} />
         ) : null}
         {profile && <CollectionsSection />}
+        {profile && <LocationsSection profileId={profile.id} />}
       </div>
     </>
   )
@@ -390,6 +393,33 @@ function CollectionsSection() {
   const [newTitle, setNewTitle] = useState('')
   const [newPrivate, setNewPrivate] = useState(false)
   const [newHovered, setNewHovered] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let target = el.scrollLeft
+    let rafId = 0
+
+    const animate = () => {
+      const diff = target - el.scrollLeft
+      if (Math.abs(diff) < 0.5) { el.scrollLeft = target; return }
+      el.scrollLeft += diff * 0.14
+      rafId = requestAnimationFrame(animate)
+    }
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY === 0) return
+      if (el.scrollWidth <= el.clientWidth) return
+      e.preventDefault()
+      target = Math.max(0, Math.min(el.scrollWidth - el.clientWidth, target + e.deltaY))
+      cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(animate)
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => { el.removeEventListener('wheel', onWheel); cancelAnimationFrame(rafId) }
+  }, [])
 
   const { data: collections = [] } = useQuery({
     queryKey: ['collections'],
@@ -524,13 +554,15 @@ function CollectionsSection() {
 
       {/* Horizontal tiles row */}
       <div
+        ref={scrollRef}
         className="pg-col-scroll"
         style={{
           display: 'flex',
           gap: 12,
           overflowX: 'auto',
-          paddingBottom: 6,
-          scrollbarWidth: 'none',
+          paddingBottom: 8,
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(111,207,151,0.15) transparent',
         }}
       >
         {/* New collection tile */}
@@ -583,6 +615,199 @@ function CollectionsSection() {
         {collections.map(col => (
           <CollectionTile key={col.id} collection={col} />
         ))}
+      </div>
+    </div>
+  )
+}
+
+// --- Locations section ---
+
+const CATEGORY_COLOR: Record<LocationCategory, string> = {
+  study_spot: '#7EB8F7',
+  food:       '#F5A623',
+  scenic:     '#6FCF97',
+  hangout:    '#B88EF0',
+  trail:      '#C4956A',
+  activity:   '#F06B6B',
+  other:      '#8899AA',
+}
+
+const CATEGORY_LABEL: Record<LocationCategory, string> = {
+  study_spot: 'Study Spot',
+  food:       'Food & Drink',
+  scenic:     'Scenic',
+  hangout:    'Hangout',
+  trail:      'Trail',
+  activity:   'Activity',
+  other:      'Other',
+}
+
+function LocationsSection({ profileId }: { profileId: string }) {
+  const { data: locations = [], isLoading } = useQuery({
+    queryKey: ['userLocations', profileId],
+    queryFn: () => apiGet<LocationResponse[]>(`/api/users/${profileId}/locations`),
+  })
+
+  return (
+    <div style={{
+      width: '100%',
+      maxWidth: 560,
+      marginTop: 22,
+      animation: 'pg-fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.48s both',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 14,
+        paddingLeft: 2,
+      }}>
+        <span style={{
+          color: '#3a5e4a',
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: '0.24em',
+          textTransform: 'uppercase',
+        }}>My Locations</span>
+        <span style={{
+          fontSize: 9,
+          color: '#6FCF97',
+          background: 'rgba(111,207,151,0.08)',
+          border: '1px solid rgba(111,207,151,0.12)',
+          padding: '1px 7px',
+          borderRadius: 10,
+          fontVariantNumeric: 'tabular-nums',
+        }}>{locations.length}</span>
+      </div>
+
+      {isLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{
+              height: 54,
+              borderRadius: 10,
+              background: 'linear-gradient(90deg, rgba(111,207,151,0.04) 25%, rgba(111,207,151,0.08) 50%, rgba(111,207,151,0.04) 75%)',
+              backgroundSize: '200% 100%',
+              animation: `pg-shimmer 1.7s linear ${i * 0.1}s infinite`,
+            }} />
+          ))}
+        </div>
+      ) : locations.length === 0 ? (
+        <div style={{
+          textAlign: 'center',
+          padding: '28px 0',
+          color: '#3a5e4a',
+          fontSize: 12,
+          letterSpacing: '0.04em',
+        }}>
+          No locations yet.
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          maxHeight: 340,
+          overflowY: 'auto',
+          paddingRight: 4,
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(111,207,151,0.15) transparent',
+        }}>
+          {locations.map((loc, i) => (
+            <LocationRow key={loc.id} location={loc} index={i} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LocationRow({ location, index }: { location: LocationResponse; index: number }) {
+  const [hovered, setHovered] = useState(false)
+  const color = CATEGORY_COLOR[location.category]
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '10px 14px',
+        borderRadius: 10,
+        border: `1px solid ${hovered ? `${color}22` : 'rgba(111,207,151,0.07)'}`,
+        background: hovered ? 'rgba(9,23,17,0.7)' : 'rgba(9,23,17,0.4)',
+        transition: 'border-color 0.15s, background 0.15s',
+        animation: `pg-fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) ${0.48 + index * 0.04}s both`,
+      }}
+    >
+      {/* Category dot */}
+      <div style={{
+        width: 7,
+        height: 7,
+        borderRadius: '50%',
+        background: color,
+        flexShrink: 0,
+      }} />
+
+      {/* Name + category */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: '#EEEEEE',
+          letterSpacing: '-0.01em',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          lineHeight: 1.3,
+          marginBottom: 2,
+        }}>
+          {location.name}
+        </div>
+        <div style={{
+          fontSize: 9,
+          color: '#3a5e4a',
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          fontWeight: 600,
+        }}>
+          {CATEGORY_LABEL[location.category]}
+        </div>
+      </div>
+
+      {/* Right: rating · private · pending */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ color: '#F5A623', fontSize: 9 }}>★</span>
+          <span style={{ fontSize: 10, color: '#556a62', letterSpacing: '0.04em' }}>
+            {Number(location.avgRating).toFixed(1)}
+          </span>
+        </div>
+
+        {location.isPrivate && (
+          <svg width="9" height="9" viewBox="0 0 8 8" fill="none" style={{ color: '#3a5e4a' }}>
+            <rect x="1" y="3.5" width="6" height="4.5" rx="0.8" stroke="currentColor" strokeWidth="1" />
+            <path d="M2.2 3.5V2.4a1.8 1.8 0 013.6 0v1.1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+          </svg>
+        )}
+
+        {location.status === 'pending' && (
+          <span style={{
+            fontSize: 8,
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: '#F5A623',
+            background: 'rgba(245,166,35,0.08)',
+            border: '1px solid rgba(245,166,35,0.18)',
+            padding: '2px 6px',
+            borderRadius: 4,
+          }}>
+            Pending
+          </span>
+        )}
       </div>
     </div>
   )
