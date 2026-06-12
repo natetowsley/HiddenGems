@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueries } from '@tanstack/react-query'
 import { apiGet } from '@/api/client'
 import type { LocationCategory, LocationResponse, PublicUserResponse, ReviewResponse } from '@/types'
 import AddToCollectionModal from './AddToCollectionModal'
@@ -48,7 +48,8 @@ function Stars({ rating, size = 11 }: { rating: number; size?: number }) {
   )
 }
 
-function ReviewCard({ review }: { review: ReviewResponse }) {
+function ReviewCard({ review, reviewer }: { review: ReviewResponse; reviewer?: PublicUserResponse }) {
+  const navigate = useNavigate()
   const date = new Date(review.createdAt).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -58,7 +59,20 @@ function ReviewCard({ review }: { review: ReviewResponse }) {
   return (
     <div className="ls-review-card">
       <div className="ls-review-header">
-        <span className="ls-review-user">@{review.userId.slice(0, 12)}</span>
+        <button
+          className="ls-review-user"
+          onClick={() => reviewer?.username && navigate(`/users/${reviewer.username}`)}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: 'inherit',
+            textAlign: 'left',
+            cursor: reviewer?.username ? 'pointer' : 'default',
+          }}
+        >
+          @{reviewer?.username ?? '…'}
+        </button>
         <span className="ls-review-date">{date}</span>
         <div className="ls-review-stars">
           {[1, 2, 3, 4, 5].map(i => (
@@ -118,6 +132,18 @@ export default function LocationSheet({ location, onClose }: Props) {
     queryFn: () => apiGet<PublicUserResponse>(`/api/users/${loc!.createdBy}`),
     enabled: !!loc,
   })
+
+  const uniqueReviewerIds = [...new Set(reviews.map(r => r.userId))]
+  const reviewerQueries = useQueries({
+    queries: uniqueReviewerIds.map(uid => ({
+      queryKey: ['user', uid],
+      queryFn: () => apiGet<PublicUserResponse>(`/api/users/${uid}`),
+      enabled: reviews.length > 0,
+    })),
+  })
+  const reviewerMap = Object.fromEntries(
+    uniqueReviewerIds.map((uid, i) => [uid, reviewerQueries[i]?.data])
+  )
 
   const latStr = loc
     ? `${Math.abs(loc.lat).toFixed(4)}° ${loc.lat >= 0 ? 'N' : 'S'}`
@@ -235,7 +261,7 @@ export default function LocationSheet({ location, onClose }: Props) {
               <p className="ls-empty">No reviews yet. Be the first to leave one.</p>
             ) : (
               <div className="ls-reviews-list">
-                {reviews.map(r => <ReviewCard key={r.id} review={r} />)}
+                {reviews.map(r => <ReviewCard key={r.id} review={r} reviewer={reviewerMap[r.userId]} />)}
               </div>
             )}
           </div>
