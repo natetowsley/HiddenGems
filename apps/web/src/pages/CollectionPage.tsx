@@ -48,15 +48,6 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 
-function Stars({ rating }: { rating: number }) {
-  return (
-    <span>
-      {[1, 2, 3, 4, 5].map(i => (
-        <span key={i} style={{ color: i <= Math.round(rating) ? '#F5A623' : '#1e3b30', fontSize: 9 }}>★</span>
-      ))}
-    </span>
-  )
-}
 
 export default function CollectionPage() {
   const { id } = useParams<{ id: string }>()
@@ -94,6 +85,20 @@ export default function CollectionPage() {
   })
 
   const [selectedLocation, setSelectedLocation] = useState<LocationResponse | null>(null)
+  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
+
+  const qc = useQueryClient()
+  const removeItemMutation = useMutation({
+    mutationFn: (locationId: string) =>
+      apiDelete(`/api/collections/${id}/items/${locationId}`),
+    onMutate: (locationId) => {
+      setRemovingIds(prev => new Set(prev).add(locationId))
+    },
+    onSettled: (_, __, locationId) => {
+      setRemovingIds(prev => { const next = new Set(prev); next.delete(locationId); return next })
+      qc.invalidateQueries({ queryKey: ['collections', id] })
+    },
+  })
 
   const color = collection ? accentColor(collection.title) : '#6FCF97'
   const isOwner = !!user && !!collection && collection.userId === user.id
@@ -184,7 +189,15 @@ export default function CollectionPage() {
                 gap: 12,
               }}>
                 {locations.map((loc, i) => (
-                  <LocationCard key={loc.id} location={loc} index={i} onClick={() => setSelectedLocation(loc)} />
+                  <LocationCard
+                    key={loc.id}
+                    location={loc}
+                    index={i}
+                    onClick={() => setSelectedLocation(loc)}
+                    isOwner={isOwner}
+                    isRemoving={removingIds.has(loc.id)}
+                    onRemove={() => removeItemMutation.mutate(loc.id)}
+                  />
                 ))}
               </div>
             )}
@@ -615,7 +628,16 @@ function CollectionHeader({
   )
 }
 
-function LocationCard({ location, index, onClick }: { location: LocationResponse; index: number; onClick: () => void }) {
+function LocationCard({
+  location, index, onClick, isOwner, isRemoving, onRemove,
+}: {
+  location: LocationResponse
+  index: number
+  onClick: () => void
+  isOwner?: boolean
+  isRemoving?: boolean
+  onRemove?: () => void
+}) {
   const [hovered, setHovered] = useState(false)
   const color = CATEGORY_COLOR[location.category]
   const snippet = location.description
@@ -633,10 +655,11 @@ function LocationCard({ location, index, onClick }: { location: LocationResponse
         border: `1px solid ${hovered ? `${color}28` : 'rgba(111,207,151,0.07)'}`,
         borderRadius: 10,
         overflow: 'hidden',
-        transition: 'border-color 0.15s, background 0.15s',
+        transition: 'border-color 0.15s, background 0.15s, opacity 0.15s',
         display: 'flex',
         flexDirection: 'column',
         animation: `cp-fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) ${index * 0.04}s both`,
+        opacity: isRemoving ? 0.4 : 1,
       }}
     >
       {/* Category color bar */}
@@ -654,24 +677,55 @@ function LocationCard({ location, index, onClick }: { location: LocationResponse
           }}>
             {CATEGORY_LABEL[location.category]}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Stars rating={location.avgRating} />
+          {isOwner && (
+            <button
+              onClick={e => { e.stopPropagation(); onRemove?.() }}
+              title="Remove from collection"
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                background: 'rgba(224,85,85,0.15)',
+                border: '1px solid rgba(224,85,85,0.3)',
+                color: '#e05555',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                padding: 0,
+                flexShrink: 0,
+                transition: 'background 0.15s',
+                visibility: hovered && !isRemoving ? 'visible' : 'hidden',
+                pointerEvents: hovered && !isRemoving ? 'auto' : 'none',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,85,85,0.3)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(224,85,85,0.15)' }}
+            >
+              <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                <path d="M1 1l5 5M6 1L1 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Name + rating */}
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
+          <div style={{
+            fontFamily: 'Syne, sans-serif',
+            fontSize: 14,
+            fontWeight: 700,
+            color: '#EEEEEE',
+            letterSpacing: '-0.02em',
+            lineHeight: 1.2,
+          }}>
+            {location.name}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+            <span style={{ color: '#F5A623', fontSize: 9 }}>★</span>
             <span style={{ fontSize: 10, color: '#556a62', letterSpacing: '0.04em' }}>
               {location.avgRating.toFixed(1)}
             </span>
           </div>
-        </div>
-
-        {/* Name */}
-        <div style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: 14,
-          fontWeight: 700,
-          color: '#EEEEEE',
-          letterSpacing: '-0.02em',
-          lineHeight: 1.2,
-        }}>
-          {location.name}
         </div>
 
         {/* Description */}
