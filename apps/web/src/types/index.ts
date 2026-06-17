@@ -16,6 +16,8 @@ export interface PublicUserResponse {
   name: string
   username: string
   avatarUrl: string | null
+  role: UserRole
+  createdAt: string
 }
 
 export type LocationCategory =
@@ -63,6 +65,7 @@ export interface CollectionResponse {
   userId: string
   title: string
   isPrivate: boolean
+  locationIds: string[]
   createdAt: string
 }
 

@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
+import { useQuery, useQueries } from '@tanstack/react-query'
 import { apiGet } from '@/api/client'
-import type { LocationCategory, LocationResponse, ReviewResponse } from '@/types'
+import type { LocationCategory, LocationResponse, PublicUserResponse, ReviewResponse } from '@/types'
+import AddToCollectionModal from './AddToCollectionModal'
 import './LocationSheet.css'
 
 const CATEGORY_COLOR: Record<LocationCategory, string> = {
@@ -45,7 +48,8 @@ function Stars({ rating, size = 11 }: { rating: number; size?: number }) {
   )
 }
 
-function ReviewCard({ review }: { review: ReviewResponse }) {
+function ReviewCard({ review, reviewer }: { review: ReviewResponse; reviewer?: PublicUserResponse }) {
+  const navigate = useNavigate()
   const date = new Date(review.createdAt).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -55,7 +59,20 @@ function ReviewCard({ review }: { review: ReviewResponse }) {
   return (
     <div className="ls-review-card">
       <div className="ls-review-header">
-        <span className="ls-review-user">@{review.userId.slice(0, 12)}</span>
+        <button
+          className="ls-review-user"
+          onClick={() => reviewer?.username && navigate(`/users/${reviewer.username}`)}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: 'inherit',
+            textAlign: 'left',
+            cursor: reviewer?.username ? 'pointer' : 'default',
+          }}
+        >
+          @{reviewer?.username ?? '…'}
+        </button>
         <span className="ls-review-date">{date}</span>
         <div className="ls-review-stars">
           {[1, 2, 3, 4, 5].map(i => (
@@ -90,11 +107,14 @@ interface Props {
 }
 
 export default function LocationSheet({ location, onClose }: Props) {
+  const navigate = useNavigate()
   // Keep last non-null location displayed during slide-out animation
   const [displayed, setDisplayed] = useState<LocationResponse | null>(location)
+  const [collectionOpen, setCollectionOpen] = useState(false)
 
   useEffect(() => {
     if (location) setDisplayed(location)
+    else setCollectionOpen(false)
   }, [location])
 
   const isOpen = location !== null
@@ -107,6 +127,24 @@ export default function LocationSheet({ location, onClose }: Props) {
     enabled: !!loc,
   })
 
+  const { data: creator } = useQuery({
+    queryKey: ['user', loc?.createdBy],
+    queryFn: () => apiGet<PublicUserResponse>(`/api/users/${loc!.createdBy}`),
+    enabled: !!loc,
+  })
+
+  const uniqueReviewerIds = [...new Set(reviews.map(r => r.userId))]
+  const reviewerQueries = useQueries({
+    queries: uniqueReviewerIds.map(uid => ({
+      queryKey: ['user', uid],
+      queryFn: () => apiGet<PublicUserResponse>(`/api/users/${uid}`),
+      enabled: reviews.length > 0,
+    })),
+  })
+  const reviewerMap = Object.fromEntries(
+    uniqueReviewerIds.map((uid, i) => [uid, reviewerQueries[i]?.data])
+  )
+
   const latStr = loc
     ? `${Math.abs(loc.lat).toFixed(4)}° ${loc.lat >= 0 ? 'N' : 'S'}`
     : ''
@@ -115,6 +153,7 @@ export default function LocationSheet({ location, onClose }: Props) {
     : ''
 
   return (
+    <>
     <aside className={`location-sheet${isOpen ? ' location-sheet--open' : ''}`}>
 
       <div className="ls-accent-bar" style={{ background: color }} />
@@ -127,9 +166,10 @@ export default function LocationSheet({ location, onClose }: Props) {
         </button>
 
         <div className="ls-header-actions">
-          <button className="ls-action-btn save" onClick={() => console.log('save', loc?.id)}>
+          <button className="ls-action-btn save" onClick={() => setCollectionOpen(true)}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 1.5h8v9L6 8.5 2 10.5V1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+              <path d="M1.5 5H5l1-1.5h5V11H1.5V5Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+              <path d="M6 7.5v2M5 8.5h2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
             </svg>
             Save
           </button>
@@ -166,6 +206,22 @@ export default function LocationSheet({ location, onClose }: Props) {
               )}
               {loc.isPrivate && <span className="ls-private-badge">Private</span>}
             </div>
+
+            <button className="ls-creator" onClick={() => creator?.username && navigate(`/users/${creator.username}`)}>
+              <div className="ls-creator-avatar">
+                {creator?.avatarUrl ? (
+                  <img src={creator.avatarUrl} alt={creator.username} className="ls-creator-avatar-img" />
+                ) : (
+                  <span className="ls-creator-avatar-fallback">
+                    {creator?.username?.[0]?.toUpperCase() ?? '?'}
+                  </span>
+                )}
+              </div>
+              <span className="ls-creator-username">@{creator?.username ?? '…'}</span>
+              <svg className="ls-creator-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5h6M5.5 2.5L8 5l-2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
 
             <h2 className="ls-name">{loc.name}</h2>
 
@@ -205,7 +261,7 @@ export default function LocationSheet({ location, onClose }: Props) {
               <p className="ls-empty">No reviews yet. Be the first to leave one.</p>
             ) : (
               <div className="ls-reviews-list">
-                {reviews.map(r => <ReviewCard key={r.id} review={r} />)}
+                {reviews.map(r => <ReviewCard key={r.id} review={r} reviewer={reviewerMap[r.userId]} />)}
               </div>
             )}
           </div>
@@ -214,5 +270,14 @@ export default function LocationSheet({ location, onClose }: Props) {
         </div>
       )}
     </aside>
+    {loc && createPortal(
+      <AddToCollectionModal
+        locationId={loc.id}
+        isOpen={collectionOpen}
+        onClose={() => setCollectionOpen(false)}
+      />,
+      document.body
+    )}
+    </>
   )
 }

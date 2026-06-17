@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -46,35 +47,62 @@ public class CollectionService {
         this.userRepository = userRepository;
     }
 
+    // Fix #2 (requesterId existence) + Fix #1/#2 (location filtering for non-owners)
     @Transactional(readOnly = true)
     public List<CollectionResponse> getPublicByUser(UUID userId, UUID requesterId) {
         if (!userRepository.existsById(userId)) {
             throw new EntityNotFoundException("User not found: " + userId);
+        }
+        if (!userRepository.existsById(requesterId)) {
+            throw new EntityNotFoundException("User not found: " + requesterId);
         }
 
         boolean isOwner = userId.equals(requesterId);
         boolean isAdmin = !isOwner && userRepository.findById(requesterId)
                 .map(u -> u.getRole() == User.Role.admin)
                 .orElse(false);
+        boolean fullAccess = isOwner || isAdmin;
 
         List<Collection> collections = collectionRepository.findByUserId(userId);
         List<Collection> visible = collections.stream()
-                .filter(c -> !c.isPrivate() || isOwner || isAdmin)
+                .filter(c -> !c.isPrivate() || fullAccess)
                 .toList();
 
         if (visible.isEmpty()) return List.of();
 
-        List<UUID> visibleIds = visible.stream().map(Collection::getId).toList();
+        List<UUID> visibleCollectionIds = visible.stream().map(Collection::getId).toList();
         Map<UUID, List<UUID>> itemsByCollection = collectionItemRepository
-                .findByCollectionIdIn(visibleIds)
+                .findByCollectionIdIn(visibleCollectionIds)
                 .stream()
                 .collect(Collectors.groupingBy(
                         CollectionItem::getCollectionId,
                         Collectors.mapping(CollectionItem::getLocationId, Collectors.toList())
                 ));
 
+        if (fullAccess) {
+            return visible.stream()
+                    .map(c -> CollectionResponse.from(c, itemsByCollection.getOrDefault(c.getId(), List.of())))
+                    .toList();
+        }
+
+        // Non-owner/non-admin: batch-load all referenced locations and filter to only visible ones
+        Set<UUID> allLocationIds = itemsByCollection.values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toSet());
+        Map<UUID, Location> locationMap = locationRepository.findAllById(allLocationIds).stream()
+                .collect(Collectors.toMap(Location::getId, loc -> loc));
+
         return visible.stream()
-                .map(c -> CollectionResponse.from(c, itemsByCollection.getOrDefault(c.getId(), List.of())))
+                .map(c -> {
+                    List<UUID> rawIds = itemsByCollection.getOrDefault(c.getId(), List.of());
+                    List<UUID> filteredIds = rawIds.stream()
+                            .filter(locId -> {
+                                Location loc = locationMap.get(locId);
+                                return loc != null && canViewLocation(loc, requesterId, false);
+                            })
+                            .toList();
+                    return CollectionResponse.from(c, filteredIds);
+                })
                 .toList();
     }
 
@@ -99,6 +127,7 @@ public class CollectionService {
                 .toList();
     }
 
+    // Fix #1/#2: use filtered toResponse so non-owners only see location IDs they can access
     @Transactional(readOnly = true)
     public CollectionResponse getById(UUID id, UUID requesterId) {
         Collection collection = collectionRepository.findById(id)
@@ -108,7 +137,7 @@ public class CollectionService {
             throw new AccessDeniedException("You do not have permission to view this collection");
         }
 
-        return toResponse(collection);
+        return toResponse(collection, requesterId);
     }
 
     public CollectionResponse createCollection(CreateCollectionRequest request, UUID userId) {
@@ -177,20 +206,52 @@ public class CollectionService {
 
     // Helpers
 
+    // Fix #1: also blocks pending locations for non-creator/non-admin
     private boolean hasLocationAccess(Location location, UUID requesterId) {
-        if (!location.isPrivate()) return true;
-        if (location.getCreatedBy().equals(requesterId)) return true;
+        boolean isCreator = location.getCreatedBy().equals(requesterId);
+        if (isCreator) return true;
         User requester = userRepository.findById(requesterId).orElse(null);
-        if (requester != null && requester.getRole() == User.Role.admin) return true;
-        return locationInviteRepository.existsByLocationIdAndUserId(location.getId(), requesterId);
+        boolean isAdmin = requester != null && requester.getRole() == User.Role.admin;
+        if (isAdmin) return true;
+        if (location.getStatus() == Location.Status.pending) return false;
+        if (location.isPrivate()) {
+            return locationInviteRepository.existsByLocationIdAndUserId(location.getId(), requesterId);
+        }
+        return true;
     }
 
+    // Used in batch-filtering paths to avoid repeated user DB lookups
+    private boolean canViewLocation(Location location, UUID requesterId, boolean requesterIsAdmin) {
+        boolean isCreator = location.getCreatedBy().equals(requesterId);
+        if (isCreator || requesterIsAdmin) return true;
+        if (location.getStatus() == Location.Status.pending) return false;
+        if (location.isPrivate()) {
+            return locationInviteRepository.existsByLocationIdAndUserId(location.getId(), requesterId);
+        }
+        return true;
+    }
+
+    // Unfiltered — used for owner's own operations (create, update, addItem)
     private CollectionResponse toResponse(Collection collection) {
         List<UUID> locationIds = collectionItemRepository.findByCollectionId(collection.getId())
                 .stream()
                 .map(CollectionItem::getLocationId)
                 .toList();
         return CollectionResponse.from(collection, locationIds);
+    }
+
+    // Filtered — used for read paths that may be viewed by non-owners
+    private CollectionResponse toResponse(Collection collection, UUID requesterId) {
+        List<UUID> allIds = collectionItemRepository.findByCollectionId(collection.getId())
+                .stream().map(CollectionItem::getLocationId).toList();
+        if (allIds.isEmpty() || isOwnerOrAdmin(collection, requesterId)) {
+            return CollectionResponse.from(collection, allIds);
+        }
+        List<UUID> visibleIds = locationRepository.findAllById(allIds).stream()
+                .filter(loc -> canViewLocation(loc, requesterId, false))
+                .map(Location::getId)
+                .toList();
+        return CollectionResponse.from(collection, visibleIds);
     }
 
     private void checkOwnership(Collection collection, UUID requesterId) {

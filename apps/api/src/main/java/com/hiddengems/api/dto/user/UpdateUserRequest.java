@@ -9,6 +9,10 @@ public record UpdateUserRequest(
     @Size(max = 255)
     String name,
 
+    @NotBlank(message = "Username is required")
+    @Size(max = 255)
+    String username,
+
     // nullable, user may clear their avatar
     String avatarUrl
 ) {}

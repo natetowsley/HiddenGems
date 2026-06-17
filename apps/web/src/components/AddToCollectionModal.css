@@ -1,0 +1,399 @@
+/* ── Backdrop ─────────────────────────────────────── */
+.atcm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(2, 7, 5, 0.84);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: atcm-bg-in 0.18s ease;
+}
+
+@keyframes atcm-bg-in {
+  from { opacity: 0 }
+  to   { opacity: 1 }
+}
+
+/* ── Modal shell ──────────────────────────────────── */
+.atcm-modal {
+  width: 356px;
+  max-height: 520px;
+  background: #060f0b;
+  border: 1px solid rgba(111, 207, 151, 0.11);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(111, 207, 151, 0.04),
+    0 28px 70px rgba(0, 0, 0, 0.82);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: atcm-modal-in 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes atcm-modal-in {
+  from { opacity: 0; transform: translateY(22px) scale(0.97) }
+  to   { opacity: 1; transform: translateY(0) scale(1) }
+}
+
+/* ── Header ───────────────────────────────────────── */
+.atcm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid rgba(111, 207, 151, 0.06);
+  flex-shrink: 0;
+}
+
+.atcm-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #EEEEEE;
+  letter-spacing: -0.1px;
+}
+
+.atcm-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(111, 207, 151, 0.1);
+  background: rgba(111, 207, 151, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.atcm-close:hover {
+  background: rgba(111, 207, 151, 0.09);
+  border-color: rgba(111, 207, 151, 0.22);
+}
+
+/* ── Scrollable body ──────────────────────────────── */
+.atcm-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(111, 207, 151, 0.12) transparent;
+}
+
+.atcm-body::-webkit-scrollbar { width: 3px }
+.atcm-body::-webkit-scrollbar-track { background: transparent }
+.atcm-body::-webkit-scrollbar-thumb {
+  background: rgba(111, 207, 151, 0.12);
+  border-radius: 2px;
+}
+
+/* ── New collection row ───────────────────────────── */
+.atcm-new-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px dashed rgba(111, 207, 151, 0.18);
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.atcm-new-row:hover {
+  border-color: rgba(111, 207, 151, 0.34);
+  background: rgba(111, 207, 151, 0.04);
+}
+
+.atcm-new-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: rgba(111, 207, 151, 0.08);
+  border: 1px solid rgba(111, 207, 151, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #6FCF97;
+  transition: background 0.15s;
+}
+
+.atcm-new-row:hover .atcm-new-icon {
+  background: rgba(111, 207, 151, 0.14);
+}
+
+.atcm-new-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #6FCF97;
+  letter-spacing: 0.02em;
+}
+
+/* ── Create form ──────────────────────────────────── */
+.atcm-create-form {
+  border: 1px solid rgba(111, 207, 151, 0.12);
+  border-radius: 9px;
+  background: rgba(111, 207, 151, 0.02);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  animation: atcm-form-in 0.18s ease;
+}
+
+@keyframes atcm-form-in {
+  from { opacity: 0; transform: translateY(-5px) }
+  to   { opacity: 1; transform: translateY(0) }
+}
+
+.atcm-input {
+  width: 100%;
+  padding: 0.58rem 0.75rem;
+  background: rgba(255, 255, 255, 0.022);
+  border: 1px solid rgba(111, 207, 151, 0.1);
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  color: #EEEEEE;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.atcm-input::placeholder { color: #1e3b30 }
+.atcm-input:focus { border-color: rgba(111, 207, 151, 0.28) }
+
+.atcm-form-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.atcm-privacy-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 4px 10px;
+  border: 1px solid rgba(111, 207, 151, 0.1);
+  border-radius: 5px;
+  background: transparent;
+  font-family: 'Outfit', sans-serif;
+  font-size: 10.5px;
+  color: #556a62;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.atcm-privacy-toggle.on {
+  color: #6FCF97;
+  border-color: rgba(111, 207, 151, 0.26);
+  background: rgba(111, 207, 151, 0.06);
+}
+
+.atcm-form-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.atcm-btn-ghost {
+  padding: 4px 11px;
+  border: 1px solid rgba(111, 207, 151, 0.07);
+  border-radius: 5px;
+  background: transparent;
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  color: #556a62;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.atcm-btn-ghost:hover {
+  color: #9aada5;
+  border-color: rgba(111, 207, 151, 0.14);
+}
+
+.atcm-btn-primary {
+  padding: 4px 13px;
+  border: 1px solid rgba(111, 207, 151, 0.24);
+  border-radius: 5px;
+  background: rgba(111, 207, 151, 0.1);
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: #6FCF97;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.atcm-btn-primary:hover:not(:disabled) {
+  background: rgba(111, 207, 151, 0.17);
+  border-color: rgba(111, 207, 151, 0.38);
+}
+
+.atcm-btn-primary:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+/* ── Separator ─────────────────────────────────────── */
+.atcm-sep {
+  height: 1px;
+  background: rgba(111, 207, 151, 0.06);
+  margin: 0.8rem 0;
+}
+
+/* ── Loading skeletons ─────────────────────────────── */
+.atcm-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+}
+
+.atcm-skeleton {
+  height: 58px;
+  border-radius: 9px;
+  background: rgba(111, 207, 151, 0.035);
+  animation: atcm-pulse 1.5s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes atcm-pulse {
+  0%, 100% { opacity: 0.45 }
+  50%       { opacity: 0.9 }
+}
+
+/* ── Empty state ───────────────────────────────────── */
+.atcm-empty {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12.5px;
+  color: #2d5248;
+  font-style: italic;
+  text-align: center;
+  padding: 1.25rem 0 0.5rem;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── Collections list ──────────────────────────────── */
+.atcm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+
+/* ── Collection item ───────────────────────────────── */
+.atcm-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.7rem 0.5rem 0.5rem;
+  border: 1px solid rgba(111, 207, 151, 0.05);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.016);
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.atcm-item:hover {
+  background: rgba(111, 207, 151, 0.05);
+  border-color: rgba(111, 207, 151, 0.12);
+}
+
+.atcm-item--in {
+  border-color: rgba(111, 207, 151, 0.14);
+  background: rgba(111, 207, 151, 0.04);
+}
+
+/* ── Thumbnail ─────────────────────────────────────── */
+.atcm-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 7px;
+  border: 1px solid;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.atcm-thumb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.03) 0px,
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 7px
+  );
+  pointer-events: none;
+}
+
+.atcm-thumb-letter {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Item text ─────────────────────────────────────── */
+.atcm-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.atcm-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #EEEEEE;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+.atcm-item-sub {
+  font-size: 10.5px;
+  color: #2d5248;
+  letter-spacing: 0.04em;
+}
+
+/* ── Checkmark ─────────────────────────────────────── */
+.atcm-check {
+  flex-shrink: 0;
+}
+
+.atcm-check--on svg {
+  animation: atcm-check-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes atcm-check-pop {
+  from { transform: scale(0.55); opacity: 0 }
+  to   { transform: scale(1);    opacity: 1 }
+}

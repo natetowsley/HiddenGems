@@ -1,8 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import AuthLayout from '@/components/AuthLayout'
 import LoginPage from '@/pages/LoginPage'
 import SignupPage from '@/pages/SignupPage'
 import MapPage from '@/pages/MapPage'
+import ProfilePage from '@/pages/ProfilePage'
+import CollectionPage from '@/pages/CollectionPage'
+import SettingsPage from '@/pages/SettingsPage'
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth()
@@ -26,7 +30,15 @@ export function AppRouter() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
-        <Route path="/" element={<RequireAuth><MapPage /></RequireAuth>} />
+
+        <Route element={<RequireAuth><AuthLayout /></RequireAuth>}>
+          <Route path="/" element={<MapPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/users/:username" element={<ProfilePage />} />
+          <Route path="/collections/:id" element={<CollectionPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

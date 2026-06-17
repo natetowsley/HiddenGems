@@ -72,6 +72,20 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public PublicUserResponse getPublicByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .map(PublicUserResponse::from)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + username));
+    }
+
+    @Transactional(readOnly = true)
+    public UUID getIdByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .map(User::getId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + username));
+    }
+
+    @Transactional(readOnly = true)
     public UserResponse getByEmail(String email) {
         return userRepository.findByEmail(email)
                 .map(UserResponse::from)
@@ -85,7 +99,12 @@ public class UserService {
 
         checkOwnership(user, requesterId);
 
+        if (!user.getUsername().equals(request.username()) && userRepository.existsByUsername(request.username())) {
+            throw new IllegalStateException("Username already taken");
+        }
+
         user.setName(request.name());
+        user.setUsername(request.username());
         user.setAvatarUrl(request.avatarUrl());
 
         return UserResponse.from(userRepository.save(user));

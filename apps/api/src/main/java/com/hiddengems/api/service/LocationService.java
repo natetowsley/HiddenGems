@@ -126,10 +126,21 @@ public class LocationService {
         if (!userRepository.existsById(userId)) {
             throw new EntityNotFoundException("User not found: " + userId);
         }
+        boolean isOwner = userId.equals(requesterId);
         boolean isAdmin = isAdmin(requesterId);
+
+        if (isOwner || isAdmin) {
+            // Owner and admins see all non-archived locations including pending and private
+            return locationRepository.findByCreatedBy(userId)
+                    .stream()
+                    .filter(l -> l.getStatus() != Location.Status.archived)
+                    .map(LocationResponse::from)
+                    .toList();
+        }
+
         return locationRepository.findByCreatedByAndStatus(userId, Location.Status.verified)
                 .stream()
-                .filter(l -> hasLocationAccess(l, requesterId, isAdmin))
+                .filter(l -> hasLocationAccess(l, requesterId, false))
                 .map(LocationResponse::from)
                 .toList();
     }
