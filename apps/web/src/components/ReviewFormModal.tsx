@@ -102,7 +102,9 @@ export default function ReviewFormModal({ locationId, isOpen, onClose }: Props) 
           </div>
 
           {mutation.isError && (
-            <p className="rfm-error">Something went wrong. Please try again.</p>
+            <p className="rfm-error">
+              {mutation.error instanceof Error ? mutation.error.message : 'Something went wrong. Please try again.'}
+            </p>
           )}
 
           <div className="rfm-actions">
