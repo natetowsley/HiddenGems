@@ -127,6 +127,15 @@ export default function NavBar() {
               </DropdownItem>
             ))}
 
+            {profile?.role === 'admin' && (
+              <>
+                <div style={{ height: 1, background: 'rgba(111, 207, 151, 0.1)', margin: '2px 0' }} />
+                <DropdownItem onClick={() => { setOpen(false); navigate('/admin') }} admin>
+                  Admin Panel
+                </DropdownItem>
+              </>
+            )}
+
             <div style={{ height: 1, background: 'rgba(111, 207, 151, 0.1)', margin: '2px 0' }} />
 
             <DropdownItem onClick={handleSignOut} danger>
@@ -139,10 +148,11 @@ export default function NavBar() {
   )
 }
 
-function DropdownItem({ children, onClick, danger }: {
+function DropdownItem({ children, onClick, danger, admin }: {
   children: React.ReactNode
   onClick: () => void
   danger?: boolean
+  admin?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
   return (
@@ -156,10 +166,12 @@ function DropdownItem({ children, onClick, danger }: {
         textAlign: 'left',
         padding: '9px 14px',
         background: hovered
-          ? danger ? 'rgba(224, 85, 85, 0.09)' : 'rgba(111, 207, 151, 0.08)'
+          ? danger  ? 'rgba(224, 85, 85, 0.09)'
+          : admin   ? 'rgba(255, 180, 50, 0.07)'
+                    : 'rgba(111, 207, 151, 0.08)'
           : 'none',
         border: 'none',
-        color: danger ? '#e05555' : '#EEEEEE',
+        color: danger ? '#e05555' : admin ? '#ffb432' : '#EEEEEE',
         fontFamily: 'Outfit, sans-serif',
         fontSize: 13,
         cursor: 'pointer',
