@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPatch, apiDelete } from '@/api/client'
 import type { LocationCategory, LocationResponse, PublicUserResponse, ReportResponse } from '@/types'
+import LocationSheet from '@/components/LocationSheet'
 
 const KEYFRAMES = `
 @keyframes adm-fadeUp {
@@ -34,6 +35,7 @@ type Tab = 'pending' | 'reports'
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('pending')
+  const [selectedLocation, setSelectedLocation] = useState<LocationResponse | null>(null)
 
   const { data: pending = [] } = useQuery({
     queryKey: ['admin', 'pending'],
@@ -50,6 +52,7 @@ export default function AdminPage() {
   return (
     <>
       <style>{KEYFRAMES}</style>
+      <LocationSheet location={selectedLocation} onClose={() => setSelectedLocation(null)} />
       <div style={{
         width: '100vw',
         minHeight: '100vh',
@@ -160,8 +163,8 @@ export default function AdminPage() {
           animation: 'adm-fadeUp 0.38s cubic-bezier(0.22,1,0.36,1) 0.1s both',
         }}>
           {tab === 'pending'
-            ? <PendingTab locations={pending} />
-            : <ReportsTab reports={reports} />
+            ? <PendingTab locations={pending} onSelect={setSelectedLocation} />
+            : <ReportsTab reports={reports} onSelect={setSelectedLocation} />
           }
         </div>
 
@@ -172,7 +175,7 @@ export default function AdminPage() {
 
 // ── Pending tab ────────────────────────────────────────────────────
 
-function PendingTab({ locations }: { locations: LocationResponse[] }) {
+function PendingTab({ locations, onSelect }: { locations: LocationResponse[]; onSelect: (loc: LocationResponse) => void }) {
   const qc = useQueryClient()
 
   const creatorIds = [...new Set(locations.map(l => l.createdBy))]
@@ -204,6 +207,7 @@ function PendingTab({ locations }: { locations: LocationResponse[] }) {
           location={loc}
           creator={creatorMap[loc.createdBy]}
           index={i}
+          onSelect={() => onSelect(loc)}
           onVerify={() => verifyMutation.mutate(loc.id)}
           onArchive={() => archiveMutation.mutate(loc.id)}
           verifying={verifyMutation.isPending && verifyMutation.variables === loc.id}
@@ -218,6 +222,7 @@ function PendingCard({
   location,
   creator,
   index,
+  onSelect,
   onVerify,
   onArchive,
   verifying,
@@ -226,6 +231,7 @@ function PendingCard({
   location: LocationResponse
   creator?: PublicUserResponse
   index: number
+  onSelect: () => void
   onVerify: () => void
   onArchive: () => void
   verifying: boolean
@@ -238,13 +244,20 @@ function PendingCard({
   const busy = verifying || archiving
 
   return (
-    <div style={{
-      background: 'rgba(9,23,17,0.65)',
-      border: '1px solid rgba(111,207,151,0.09)',
-      borderRadius: 12,
-      overflow: 'hidden',
-      animation: `adm-fadeUp 0.38s cubic-bezier(0.22,1,0.36,1) ${0.12 + index * 0.04}s both`,
-    }}>
+    <div
+      onClick={onSelect}
+      style={{
+        background: 'rgba(9,23,17,0.65)',
+        border: '1px solid rgba(111,207,151,0.09)',
+        borderRadius: 12,
+        overflow: 'hidden',
+        cursor: 'pointer',
+        transition: 'border-color 0.15s',
+        animation: `adm-fadeUp 0.38s cubic-bezier(0.22,1,0.36,1) ${0.12 + index * 0.04}s both`,
+      }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(111,207,151,0.22)')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(111,207,151,0.09)')}
+    >
       <div style={{ height: 2, background: color }} />
       <div style={{ padding: '14px 16px' }}>
 
@@ -311,7 +324,7 @@ function PendingCard({
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={onVerify}
+            onClick={e => { e.stopPropagation(); onVerify() }}
             disabled={busy}
             style={{
               padding: '7px 20px',
@@ -331,7 +344,7 @@ function PendingCard({
             {verifying ? 'Verifying…' : 'Verify'}
           </button>
           <button
-            onClick={onArchive}
+            onClick={e => { e.stopPropagation(); onArchive() }}
             disabled={busy}
             style={{
               padding: '7px 20px',
@@ -359,7 +372,7 @@ function PendingCard({
 
 // ── Reports tab ────────────────────────────────────────────────────
 
-function ReportsTab({ reports }: { reports: ReportResponse[] }) {
+function ReportsTab({ reports, onSelect }: { reports: ReportResponse[]; onSelect: (loc: LocationResponse) => void }) {
   const qc = useQueryClient()
 
   const locationIds = [...new Set(reports.map(r => r.locationId))]
@@ -389,17 +402,21 @@ function ReportsTab({ reports }: { reports: ReportResponse[] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {reports.map((report, i) => (
-        <ReportCard
-          key={report.id}
-          report={report}
-          location={locationMap[report.locationId]}
-          reporter={reporterMap[report.reporterId]}
-          index={i}
-          onDismiss={() => dismissMutation.mutate(report.id)}
-          dismissing={dismissMutation.isPending && dismissMutation.variables === report.id}
-        />
-      ))}
+      {reports.map((report, i) => {
+        const loc = locationMap[report.locationId]
+        return (
+          <ReportCard
+            key={report.id}
+            report={report}
+            location={loc}
+            reporter={reporterMap[report.reporterId]}
+            index={i}
+            onSelect={loc ? () => onSelect(loc) : undefined}
+            onDismiss={() => dismissMutation.mutate(report.id)}
+            dismissing={dismissMutation.isPending && dismissMutation.variables === report.id}
+          />
+        )
+      })}
     </div>
   )
 }
@@ -409,6 +426,7 @@ function ReportCard({
   location,
   reporter,
   index,
+  onSelect,
   onDismiss,
   dismissing,
 }: {
@@ -416,6 +434,7 @@ function ReportCard({
   location?: LocationResponse
   reporter?: PublicUserResponse
   index: number
+  onSelect?: () => void
   onDismiss: () => void
   dismissing: boolean
 }) {
@@ -424,13 +443,20 @@ function ReportCard({
   })
 
   return (
-    <div style={{
-      background: 'rgba(9,23,17,0.65)',
-      border: '1px solid rgba(240,107,107,0.1)',
-      borderRadius: 12,
-      overflow: 'hidden',
-      animation: `adm-fadeUp 0.38s cubic-bezier(0.22,1,0.36,1) ${0.12 + index * 0.04}s both`,
-    }}>
+    <div
+      onClick={onSelect}
+      style={{
+        background: 'rgba(9,23,17,0.65)',
+        border: '1px solid rgba(240,107,107,0.1)',
+        borderRadius: 12,
+        overflow: 'hidden',
+        cursor: onSelect ? 'pointer' : 'default',
+        transition: 'border-color 0.15s',
+        animation: `adm-fadeUp 0.38s cubic-bezier(0.22,1,0.36,1) ${0.12 + index * 0.04}s both`,
+      }}
+      onMouseEnter={e => { if (onSelect) e.currentTarget.style.borderColor = 'rgba(240,107,107,0.24)' }}
+      onMouseLeave={e => { if (onSelect) e.currentTarget.style.borderColor = 'rgba(240,107,107,0.1)' }}
+    >
       <div style={{ height: 2, background: 'rgba(240,107,107,0.55)' }} />
       <div style={{ padding: '14px 16px' }}>
 
@@ -476,7 +502,7 @@ function ReportCard({
             <span style={{ color: '#6FCF97' }}>@{reporter?.username ?? '…'}</span>
           </span>
           <button
-            onClick={onDismiss}
+            onClick={e => { e.stopPropagation(); onDismiss() }}
             disabled={dismissing}
             style={{
               padding: '6px 16px',
