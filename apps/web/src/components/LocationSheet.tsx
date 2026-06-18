@@ -5,6 +5,7 @@ import { useQuery, useQueries } from '@tanstack/react-query'
 import { apiGet } from '@/api/client'
 import type { LocationCategory, LocationResponse, PublicUserResponse, ReviewResponse } from '@/types'
 import AddToCollectionModal from './AddToCollectionModal'
+import ReviewFormModal from './ReviewFormModal'
 import './LocationSheet.css'
 
 const CATEGORY_COLOR: Record<LocationCategory, string> = {
@@ -111,10 +112,11 @@ export default function LocationSheet({ location, onClose }: Props) {
   // Keep last non-null location displayed during slide-out animation
   const [displayed, setDisplayed] = useState<LocationResponse | null>(location)
   const [collectionOpen, setCollectionOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
 
   useEffect(() => {
     if (location) setDisplayed(location)
-    else setCollectionOpen(false)
+    else { setCollectionOpen(false); setReviewOpen(false) }
   }, [location])
 
   const isOpen = location !== null
@@ -172,6 +174,12 @@ export default function LocationSheet({ location, onClose }: Props) {
               <path d="M6 7.5v2M5 8.5h2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
             </svg>
             Save
+          </button>
+          <button className="ls-action-btn review" onClick={() => setReviewOpen(true)}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1.5L7.1 4.4H10.2L7.8 6.1L8.7 9L6 7.4L3.3 9L4.2 6.1L1.8 4.4H4.9L6 1.5Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+            </svg>
+            Review
           </button>
           <button className="ls-action-btn report" onClick={() => console.log('report', loc?.id)}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -275,6 +283,14 @@ export default function LocationSheet({ location, onClose }: Props) {
         locationId={loc.id}
         isOpen={collectionOpen}
         onClose={() => setCollectionOpen(false)}
+      />,
+      document.body
+    )}
+    {loc && createPortal(
+      <ReviewFormModal
+        locationId={loc.id}
+        isOpen={reviewOpen}
+        onClose={() => setReviewOpen(false)}
       />,
       document.body
     )}
