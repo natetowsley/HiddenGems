@@ -14,7 +14,14 @@ async function authHeaders(): Promise<HeadersInit> {
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`${res.status}: ${text}`)
+    let message = `${res.status}: ${text}`
+    try {
+      const json = JSON.parse(text)
+      if (typeof json.message === 'string') message = json.message
+    } catch {
+      // not JSON — use raw text
+    }
+    throw new Error(message)
   }
   const contentType = res.headers.get('content-type')
   if (contentType?.includes('application/json')) return res.json() as Promise<T>

@@ -86,6 +86,15 @@
   border-color: rgba(111, 207, 151, 0.28);
 }
 
+.ls-action-btn.review {
+  color: #F5A623;
+  border-color: rgba(245, 166, 35, 0.18);
+}
+.ls-action-btn.review:hover {
+  background: rgba(245, 166, 35, 0.08);
+  border-color: rgba(245, 166, 35, 0.35);
+}
+
 .ls-action-btn.report {
   color: #556a62;
   border-color: rgba(85, 106, 98, 0.2);
@@ -450,7 +459,22 @@
   gap: 3px;
 }
 
-.ls-vote-btn:hover { color: #6FCF97; }
+.ls-vote-btn:hover:not(:disabled) { color: #6FCF97; }
+
+.ls-vote-btn--up-active,
+.ls-vote-btn--up-active:hover:not(:disabled) {
+  color: #6FCF97;
+}
+
+.ls-vote-btn--down-active,
+.ls-vote-btn--down-active:hover:not(:disabled) {
+  color: #F06B6B;
+}
+
+.ls-vote-btn:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
 
 /* ── Bottom padding ──────────────────────────────── */
 .ls-bottom-pad {

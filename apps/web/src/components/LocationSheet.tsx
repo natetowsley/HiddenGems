@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueries } from '@tanstack/react-query'
-import { apiGet } from '@/api/client'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiGet, apiPost, apiDelete } from '@/api/client'
 import type { LocationCategory, LocationResponse, PublicUserResponse, ReviewResponse } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 import AddToCollectionModal from './AddToCollectionModal'
+import ReviewFormModal from './ReviewFormModal'
 import './LocationSheet.css'
 
 const CATEGORY_COLOR: Record<LocationCategory, string> = {
@@ -48,13 +50,59 @@ function Stars({ rating, size = 11 }: { rating: number; size?: number }) {
   )
 }
 
-function ReviewCard({ review, reviewer }: { review: ReviewResponse; reviewer?: PublicUserResponse }) {
+function ReviewCard({
+  review,
+  reviewer,
+  locationId,
+  currentUserId,
+}: {
+  review: ReviewResponse
+  reviewer?: PublicUserResponse
+  locationId: string
+  currentUserId?: string
+}) {
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [myVote, setMyVote] = useState<'upvote' | 'downvote' | null>(null)
+
+  const isOwn = !!currentUserId && currentUserId === review.userId
+
   const date = new Date(review.createdAt).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   })
+
+  const castVote = useMutation({
+    mutationFn: (voteType: 'upvote' | 'downvote') =>
+      apiPost<ReviewResponse>(
+        `/api/locations/${locationId}/reviews/${review.id}/votes`,
+        { voteType }
+      ),
+    onSuccess: (updated, voteType) => {
+      qc.setQueryData<ReviewResponse[]>(['reviews', locationId], (old = []) =>
+        old.map(r => r.id === updated.id ? updated : r)
+      )
+      setMyVote(voteType)
+    },
+  })
+
+  const removeVote = useMutation({
+    mutationFn: () =>
+      apiDelete(`/api/locations/${locationId}/reviews/${review.id}/votes`),
+    onSuccess: () => {
+      setMyVote(null)
+      qc.invalidateQueries({ queryKey: ['reviews', locationId] })
+    },
+  })
+
+  function handleVote(type: 'upvote' | 'downvote') {
+    if (isOwn || castVote.isPending || removeVote.isPending) return
+    if (myVote === type) removeVote.mutate()
+    else castVote.mutate(type)
+  }
+
+  const busy = castVote.isPending || removeVote.isPending
 
   return (
     <div className="ls-review-card">
@@ -84,13 +132,23 @@ function ReviewCard({ review, reviewer }: { review: ReviewResponse; reviewer?: P
       {review.text && <p className="ls-review-text">{review.text}</p>}
 
       <div className="ls-review-footer">
-        <button className="ls-vote-btn">
+        <button
+          className={`ls-vote-btn${myVote === 'upvote' ? ' ls-vote-btn--up-active' : ''}`}
+          onClick={() => handleVote('upvote')}
+          disabled={isOwn || busy}
+          title={isOwn ? "Can't vote on your own review" : undefined}
+        >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path d="M5 1L9 9H1L5 1Z" fill="currentColor" />
           </svg>
           {review.upvotes}
         </button>
-        <button className="ls-vote-btn">
+        <button
+          className={`ls-vote-btn${myVote === 'downvote' ? ' ls-vote-btn--down-active' : ''}`}
+          onClick={() => handleVote('downvote')}
+          disabled={isOwn || busy}
+          title={isOwn ? "Can't vote on your own review" : undefined}
+        >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path d="M5 9L1 1H9L5 9Z" fill="currentColor" />
           </svg>
@@ -108,13 +166,15 @@ interface Props {
 
 export default function LocationSheet({ location, onClose }: Props) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   // Keep last non-null location displayed during slide-out animation
   const [displayed, setDisplayed] = useState<LocationResponse | null>(location)
   const [collectionOpen, setCollectionOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
 
   useEffect(() => {
     if (location) setDisplayed(location)
-    else setCollectionOpen(false)
+    else { setCollectionOpen(false); setReviewOpen(false) }
   }, [location])
 
   const isOpen = location !== null
@@ -172,6 +232,12 @@ export default function LocationSheet({ location, onClose }: Props) {
               <path d="M6 7.5v2M5 8.5h2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
             </svg>
             Save
+          </button>
+          <button className="ls-action-btn review" onClick={() => setReviewOpen(true)}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1.5L7.1 4.4H10.2L7.8 6.1L8.7 9L6 7.4L3.3 9L4.2 6.1L1.8 4.4H4.9L6 1.5Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+            </svg>
+            Review
           </button>
           <button className="ls-action-btn report" onClick={() => console.log('report', loc?.id)}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -261,7 +327,15 @@ export default function LocationSheet({ location, onClose }: Props) {
               <p className="ls-empty">No reviews yet. Be the first to leave one.</p>
             ) : (
               <div className="ls-reviews-list">
-                {reviews.map(r => <ReviewCard key={r.id} review={r} reviewer={reviewerMap[r.userId]} />)}
+                {reviews.map(r => (
+                  <ReviewCard
+                    key={r.id}
+                    review={r}
+                    reviewer={reviewerMap[r.userId]}
+                    locationId={loc.id}
+                    currentUserId={user?.id}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -275,6 +349,14 @@ export default function LocationSheet({ location, onClose }: Props) {
         locationId={loc.id}
         isOpen={collectionOpen}
         onClose={() => setCollectionOpen(false)}
+      />,
+      document.body
+    )}
+    {loc && createPortal(
+      <ReviewFormModal
+        locationId={loc.id}
+        isOpen={reviewOpen}
+        onClose={() => setReviewOpen(false)}
       />,
       document.body
     )}
