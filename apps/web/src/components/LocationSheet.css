@@ -459,7 +459,22 @@
   gap: 3px;
 }
 
-.ls-vote-btn:hover { color: #6FCF97; }
+.ls-vote-btn:hover:not(:disabled) { color: #6FCF97; }
+
+.ls-vote-btn--up-active,
+.ls-vote-btn--up-active:hover:not(:disabled) {
+  color: #6FCF97;
+}
+
+.ls-vote-btn--down-active,
+.ls-vote-btn--down-active:hover:not(:disabled) {
+  color: #F06B6B;
+}
+
+.ls-vote-btn:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
 
 /* ── Bottom padding ──────────────────────────────── */
 .ls-bottom-pad {
